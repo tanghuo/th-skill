@@ -1,6 +1,6 @@
 ---
 name: sr-expert
-description: Use inside sr-* workflows when an external expert agent, CLI, or heterogeneous model may materially reduce risk, especially cross-checks, adversarial reviews, bounded patch proposals, or isolated external implementation. This is a companion orchestration skill, not a replacement for sr-review, sr-task-loop, or sr-task-runner.
+description: Use inside sr-* workflows when an external expert agent, CLI, or heterogeneous model may materially reduce risk, especially cross-checks, adversarial reviews, comparison passes, bounded patch proposals, or isolated external implementation. This is a companion orchestration skill, not a replacement for sr-review, sr-task-loop, or sr-task-runner.
 ---
 
 # SR Expert
@@ -50,7 +50,15 @@ Two rules apply to every lane below. They are stated once here and referenced, n
 
 `sr-expert` only answers: whether an external expert is worth invoking, which lane to use, what context package to send, which adapter or CLI path is safe and available, and how to verify and integrate the response.
 
-Implementation note: this skill refers only to host-agnostic primitives ("host-appropriate mechanism", "the host's native subagent or task tool") and names no concrete host tool. Its copies across host skill directories may therefore be kept byte-identical without per-host tool-name or path remapping — unlike sr-* skills that hardcode host tools.
+Implementation note: this skill uses host-agnostic primitives for dispatch decisions ("host-appropriate mechanism", "the host's native subagent or task tool"). Concrete CLI names appear only as symmetric adapter examples, not as host-specific dispatch requirements. Its copies across host skill directories may therefore be kept byte-identical without per-host tool-name or path remapping — unlike sr-* skills that hardcode host tools.
+
+## Cost Gate
+
+Apply this gate before choosing a lane.
+
+Invoke an Expert only when the expected value of heterogeneity, independence, speed, or implementation leverage is greater than the cost of packaging context, running the Expert, and integrating the result.
+
+Default decision: if you cannot articulate why external expert work beats local validation or a normal host subagent, do not invoke `sr-expert`.
 
 ## When To Use This Skill
 
@@ -66,7 +74,7 @@ Use this skill when any of these hold:
 
 Do not use this skill when:
 
-- the cost test fails: packaging plus round-trip plus integration review would cost more than just validating locally. This is the default gate — if you cannot articulate why external review beats local validation, do not invoke.
+- the Cost Gate fails
 - the work is small, mechanical (renames, formatting, wording), or the next step is obvious and cheap to validate locally
 - the request is already blocked on a user or product decision
 - useful context cannot be packaged without secrets or sensitive production data, or without hidden thread context the Expert cannot verify
@@ -76,6 +84,17 @@ Do not use this skill when:
 
 Do not invoke just because subagents or an Expert CLI happen to be available.
 
+## Procedure
+
+Use this decision sequence:
+
+1. Apply the Cost Gate and decide whether an Expert is justified.
+2. Choose one lane: read-only review, adversarial challenge, patch proposal, comparison pass, or external implementation.
+3. Select the adapter path and run preflight: availability, authentication, permissions, isolation, streaming, and cost.
+4. Build the Context Package with only the information the Expert needs; if repository or directory exposure may include secrets, get explicit user consent before invoking the Expert.
+5. Invoke the Expert using the narrowest feasible workspace, connector scope, or artifact package.
+6. Treat the Expert result as evidence, not authority: review it, apply only accepted changes, validate in the Host Workspace, and report residual risk.
+
 ## Expert vs Host Subagent
 
 Host subagents and external Experts are different tools.
@@ -83,6 +102,8 @@ Host subagents and external Experts are different tools.
 Use the Host Agent's native parallelism (Codex subagents, Claude Tasks/subagents, forked threads, worktree agents) for parallel repo exploration, disjoint implementation slices, independent task execution, and verification that runs in parallel with main work.
 
 Use an external Expert for adversarial review, architecture or design challenge, diff risk scanning, alternative implementation proposals, bounded patches on an isolated surface, or tightly scoped direct implementation by an external CLI/agent when the user wants that Expert to edit code.
+
+Same-host subagents can count as Experts only when they provide a genuinely independent pass: cold packaged context, no reliance on hidden thread assumptions, and a clear output that the Host Agent will review before integration. If a subagent is just parallel execution with shared assumptions, treat it as a host worker, not an Expert.
 
 When both apply:
 
@@ -230,9 +251,10 @@ Preflight:
 1. Check whether the Expert is available using the host-appropriate mechanism.
 2. If sandboxing may hide the user's real PATH, credentials, keychain, browser session, or config, confirm availability through the host's approval/escalation mechanism before declaring the Expert unavailable.
 3. Check whether the Expert supports non-interactive prompt mode, read-only mode, scoped directory access, worker worktrees, streaming output, and tool allow/deny lists.
-4. If the Expert requires network, authentication, browser state, OAuth, API keys, keychain access, or local app state, treat that as an external capability and use the host's approval flow.
-5. Keep invocation scoped to the concrete Expert command or connector action. Do not request broad permanent permission unless the user explicitly wants that tradeoff.
-6. If the Expert is unavailable or approval is denied, mark the lane unavailable and continue with the primary `sr-*` workflow.
+4. If the Expert would see a repository, directory, browser state, or other surface that may contain secrets, get explicit user consent for that exposure before invocation.
+5. If the Expert requires network, authentication, browser state, OAuth, API keys, keychain access, or local app state, treat that as an external capability and use the host's approval flow.
+6. Keep invocation scoped to the concrete Expert command or connector action. Do not request broad permanent permission unless the user explicitly wants that tradeoff.
+7. If the Expert is unavailable or approval is denied, mark the lane unavailable and continue with the primary `sr-*` workflow.
 
 Permission rule:
 
