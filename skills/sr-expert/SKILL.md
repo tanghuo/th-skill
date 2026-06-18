@@ -42,6 +42,56 @@ When the user explicitly names `sr-expert`, an external Expert, a heterogeneous 
 
 Same-host subagents can still be useful, but they are host workers or degraded reviewers by default. They do not provide the main value of `sr-expert`: heterogeneous external judgment.
 
+## Scoped External Review Consent
+
+When the user explicitly invokes `sr-expert`, an external Expert, a heterogeneous model, multi-model review, or Expert Strict Mode for a repository task, treat that as task-scoped consent to use an external or heterogeneous Expert for the active review lane.
+
+For a Claude CLI review from Codex, this consent covers one of two read-only review shapes, depending on the selected lane: for cold workspace review, exposing the scoped repository or worker workspace so Claude/Anthropic can inspect repo facts independently; for packaged review, sending the active task's current diff, task files, and necessary source snippets. It does not authorize sending secrets, credentials, unrelated directories, browser state, production data, or hidden thread context that the Expert cannot verify.
+
+This consent is not a permission bypass. The Host Agent must still use the approval/escalation mechanism when the adapter requires network, authentication, keychain, filesystem exposure, or third-party model access. The approval request should explicitly state that the user invoked `sr-expert` and authorized this scoped external review, identify the repository or artifact scope, and say that the Expert is read-only unless a separate external implementation lane was chosen.
+
+## Reviewer-Compliant Approval Requests
+
+Reviewers and host approval systems judge the concrete command or connector request, not just this skill's policy. When escalation is needed for external review, make the approval request narrow, auditable, and safe to deny.
+
+The approval request must include:
+
+- `why`: the user explicitly invoked `sr-expert`, an external Expert, or Expert Strict Mode for the active task.
+- `destination`: the exact Expert, CLI, connector, or provider that would receive the data.
+- `scope`: the exact repository, worker workspace, task file, diff, or artifact boundary.
+- `mode`: read-only review unless the user chose an external implementation lane.
+- `data boundary`: lane-specific and explicit. For cold workspace review, the scoped repository or worker workspace is the exposure boundary. For packaged review, the boundary is the current diff, task files, and necessary source snippets. In both cases: no secrets, credentials, unrelated directories, browser state, production data, or hidden thread context.
+- `fallback`: if approval is denied, mark the external Expert lane unavailable and continue with the primary `sr-*` workflow, a user-approved same-host fallback, or self cold-review as appropriate.
+
+Do not:
+
+- ask for blanket network, filesystem, keychain, or third-party model access.
+- describe repository exposure as safe merely because secrets were excluded.
+- retry a denied private-workspace exposure by piping, copying, archiving, encoding, or otherwise disguising the same data path.
+- use vague approval wording such as "run Claude" or "use an expert" without scope, destination, and data boundary.
+
+Reusable approval wording:
+
+```text
+Allow read-only sr-expert review via [Expert/provider] for [repo/worktree/artifact scope].
+The user explicitly invoked sr-expert for this task.
+Data boundary for cold workspace review: read-only access to the scoped repo/worktree above
+so the Expert can inspect repo facts independently. No secrets, credentials, unrelated
+directories, browser state, production data, or hidden thread context.
+No external writes. If denied, I will skip this Expert lane and continue with [fallback].
+```
+
+```text
+Allow packaged read-only sr-expert review via [Expert/provider] for [artifact/diff scope].
+The user explicitly invoked sr-expert for this task.
+Data boundary for packaged review: current diff, task files, and necessary source snippets
+only. No secrets, credentials, unrelated directories, browser state, production data,
+or hidden thread context.
+No external writes. If denied, I will skip this Expert lane and continue with [fallback].
+```
+
+If the host reviewer denies or flags the request because private workspace exposure is not acceptable, accept that denial as a real unavailability signal. Do not reframe the same exposure as a different command. Continue through the active `sr-*` workflow and record that the external Expert was unavailable because approval was denied.
+
 ## Safety Invariants
 
 Two rules apply to every lane below. They are stated once here and referenced, not repeated.
@@ -62,7 +112,7 @@ Two rules apply to every lane below. They are stated once here and referenced, n
 
 `sr-expert` only answers: whether an external expert is worth invoking, which lane to use, whether to use a cold workspace entry or a packaged context, which adapter or CLI path is safe and available, and how to verify and integrate the response.
 
-Implementation note: this skill uses host-agnostic primitives for dispatch decisions ("host-appropriate mechanism", "the host's native subagent or task tool"). Concrete CLI names appear only as symmetric adapter examples, not as host-specific dispatch requirements. Its copies across host skill directories may therefore be kept byte-identical without per-host tool-name or path remapping — unlike sr-* skills that hardcode host tools.
+Implementation note: this skill uses host-agnostic primitives for dispatch decisions ("host-appropriate mechanism", "the host's native subagent or task tool"). Concrete CLI names appear only in symmetric adapter guidance for the Codex <-> Claude paths and are carried in every copy, so the skill remains byte-identical without per-host tool-name or path remapping — unlike sr-* skills that hardcode host tools.
 
 ## Cost Gate
 
@@ -299,10 +349,10 @@ Preflight:
 1. Check whether the Expert is available using the host-appropriate mechanism.
 2. If sandboxing may hide the user's real PATH, credentials, keychain, browser session, or config, confirm availability through the host's approval/escalation mechanism before declaring the Expert unavailable.
 3. Check whether the Expert supports non-interactive prompt mode, read-only mode, scoped directory access, worker worktrees, streaming output, pollable transcript/log output, and tool allow/deny lists.
-4. If the Expert would see a repository, directory, browser state, or other surface that may contain secrets, get explicit user consent for that exposure before invocation.
+4. If the Expert would see a repository, directory, browser state, or other surface that may contain secrets, confirm the exposure is covered by the user's task-scoped consent. If the requested surface exceeds the active task scope, get explicit additional consent before invocation.
 5. If the Expert requires network, authentication, browser state, OAuth, API keys, keychain access, or local app state, treat that as an external capability and use the host's approval flow.
-6. Keep invocation scoped to the concrete Expert command or connector action. Do not request broad permanent permission unless the user explicitly wants that tradeoff.
-7. Choose the best available observability mode before invocation: native streaming, PTY-visible run, background run with pollable transcript/log, or blocking capture. Do not start a long Expert run without knowing which mode is in use.
+6. Keep invocation scoped to the concrete Expert command or connector action. Use the Reviewer-Compliant Approval Requests template above: name the user-authorized scope, the destination Expert/provider, the lane-specific data boundary, the read-only or write lane, and the fallback if denied. Do not request broad permanent permission unless the user explicitly wants that tradeoff.
+7. Choose the best available observability mode before invocation: native streaming, PTY-visible run, background run with pollable transcript/log, or blocking capture. For external CLI review lanes, prefer a stream/event mode that the Host can poll incrementally; do not start a long Expert run without knowing which mode is in use.
 8. If the Expert is unavailable or approval is denied, mark the lane unavailable and continue with the primary `sr-*` workflow.
 
 Explicit `sr-expert` and Expert Strict Mode add one stricter rule: after an external or heterogeneous Expert path is marked unavailable, stop and ask whether to continue with degraded same-host fallback. Do not continue as if same-host review satisfied the Expert gate.
@@ -313,19 +363,10 @@ Permission rule:
 - "Only edit these files" is best-effort unless reinforced by working-directory isolation, CLI tool restrictions, filesystem permissions, connector scopes, or a disposable workspace.
 - For direct implementation, run the Expert inside the isolated Worker Workspace, not at the repository root.
 
-Adapter examples:
+Adapter entrypoints:
 
-- Codex Host -> Claude Expert:
-  - availability: `command -v claude` and `claude --help`, as supported by the installed CLI
-  - auth preflight: `claude auth status`, when supported
-  - observability: inspect `claude --help` for streaming, verbose, output-format, JSON/stream-JSON, TTY, or transcript options before choosing blocking prompt mode
-  - invocation: `claude -p ...`, with scoped directories, tool restrictions, and the best available streaming or transcript mode when supported
-  - common hazard: Codex command sandbox may not see Claude OAuth or macOS Keychain state; verify through host escalation before asking the user to log in again
-- Claude Host -> Codex Expert:
-  - availability: use the host-provided Codex connector/app/thread tool when available; otherwise inspect whether a Codex CLI is installed and supports non-interactive execution, for example by checking `command -v codex` and the installed tool's help output
-  - auth preflight: use the Codex connector or CLI's own status/help/auth mechanism, if available
-  - invocation: prefer a new Codex thread, Codex worktree, or non-interactive Codex CLI run with a self-contained Context Package; if the Codex path is app/thread based and does not share the host filesystem, require a textual Integration Diff instead of expecting local files to change
-  - common hazard: Claude's shell/session may not share Codex app login state, API-key environment, workspace trust, or connector permissions
+- Codex Host -> Claude Expert: use the Codex -> Claude adapter preference below.
+- Claude Host -> Codex Expert: use the Claude -> Codex adapter preference below.
 - Same-host subagent:
   - degraded fallback only; use it only after external or heterogeneous preflight fails or is unsafe, and after the user accepts the downgrade
   - use the host's native subagent or task tool instead of pretending it is an external CLI
@@ -337,23 +378,24 @@ In this environment family, optimize for the two real Expert paths first instead
 
 ### Codex Host -> Claude CLI Expert
 
-Default adapter for `sr-expert` when Codex is the Host Agent and Claude CLI is available.
+Preferred adapter when Codex is the Host Agent and Claude CLI is available.
 
 Preflight:
 
 - run `command -v claude` and inspect `claude --help`
+- when asking for approval, use the Reviewer-Compliant Approval Requests template: state that the user explicitly invoked `sr-expert` and authorized scoped read-only review, identify Claude/Anthropic as the destination, identify whether this is cold workspace review or packaged review, include the repository/workspace path or artifact boundary, list the lane-specific permitted data boundary, list forbidden surfaces such as secrets, unrelated directories, browser state, and production data, and name the fallback if approval is denied
 - prefer `claude -p` non-interactive mode for review lanes
 - if the installed CLI supports it, prefer `--output-format stream-json`; when the CLI requires a paired verbosity flag for stream JSON, include it
-- if supported, add partial/event visibility flags such as `--include-partial-messages` or `--include-hook-events` for long reviews
+- if supported, add partial/event visibility flags such as `--include-partial-messages` or `--include-hook-events` for long reviews; use them for progress detection only, and relay only milestone summaries to the user
 - for packaged read-only review that does not require repo tools, disable tools with the CLI's supported mechanism, for example `--tools ""`
 - for cold workspace review, expose only the reviewed directory and allow only read-only inspection tools where the CLI supports tool scoping
 - use a debug/transcript/log file when the CLI supports one and the run may be long
 
 Invocation preference:
 
-1. `claude -p --verbose --output-format stream-json ...` with partial messages/events when available, captured to a pollable log or surfaced by the Host tool. Include `--verbose` only when the installed CLI requires or supports it.
-2. `claude -p --output-format json ...` plus a debug/transcript/log file when stream JSON is unavailable.
-3. `claude -p ...` in TTY-visible mode when the Host can surface it safely.
+1. `claude -p --verbose --output-format stream-json ...` with partial messages/events when available, captured to a pollable log or surfaced by the Host tool. Include `--verbose` only when the installed CLI requires or supports it. This is the default for non-trivial Claude review lanes, including packaged review and cold workspace review.
+2. `claude -p ...` in TTY-visible mode when the Host can surface it safely.
+3. `claude -p --output-format json ...` only when paired with a pollable debug/transcript/log file that provides the live progress channel.
 4. Blocking `claude -p ...` only when the above are unavailable or unsafe, and only after stating that this run is `blocking capture`.
 
 Progress handling:
@@ -361,10 +403,15 @@ Progress handling:
 - parse or skim stream events for observable progress, not hidden chain-of-thought
 - relay only milestones: start, files or sections inspected, tools/commands used, emerging material findings, blockers, and finish
 - always keep the final complete Claude output for integration review
+- for packaged read-only review, combine `--tools ""` with stream JSON when supported, so the Host can still observe token and message progress without granting repository tools
+- for cold workspace review, combine stream JSON with the narrow read-only tool scope chosen for the lane
+- if stream JSON is written to a log, poll that log for event deltas every 15-30 seconds during active review; summarize only meaningful deltas
+- no new stream event means "no observable progress", not proof that the Expert is idle or not spending tokens; do not terminate solely because the final answer has not arrived
+- stop a running Claude review only when the user interrupts, a declared time/cost budget is exceeded, the CLI reports an auth/network/tool blocker, or the stream/log produces no events within the declared startup window and continuing would not be worth the cost
 
 ### Claude Host -> Codex Expert
 
-Default adapter when Claude is the Host Agent and Codex is the Expert.
+Preferred adapter when Claude is the Host Agent and Codex is the Expert.
 
 Preflight:
 
@@ -401,6 +448,7 @@ Use these rules:
   2. TTY-visible non-interactive mode, if the host can surface it safely;
   3. background execution whose stdout/stderr or transcript is written to a timestamped file and polled periodically;
   4. blocking capture only when the first three are unavailable or unsafe.
+- For Claude CLI reviews from Codex, the normal observable path is stream JSON with partial messages and hook events when supported, written to a pollable log or otherwise surfaced incrementally. Use plain blocking capture only after checking `claude --help` and determining stream JSON, TTY-visible output, and pollable logs are unavailable or unsafe.
 - When using a pollable log, announce the log path to the Host Agent's internal notes or task log, poll for meaningful deltas, and summarize milestones instead of dumping raw tokens. Always read the final complete output before integrating.
 - If the host automatically re-invokes the Host Agent when a background worker finishes, rely on that notification instead of polling. Poll only channels the host will not surface on its own (an external CLI run, a remote queue, a log-emitting process). Relying on the completion notification does not require giving up an observable log file in the meantime.
 - When you do relay progress, summarize meaningful milestones, tool actions, blockers, and changed-file hints instead of dumping every token.
