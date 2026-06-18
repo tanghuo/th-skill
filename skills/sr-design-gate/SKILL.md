@@ -319,3 +319,7 @@ When writing files, summarize what changed and provide the design path.
 - Splitting tasks from a design that still has blocking product decisions.
 - Inventing abstractions because a design doc feels more "complete" with them.
 - Running a heavy process for a one-line bug fix.
+
+## Skill Maintenance
+
+When editing this skill, follow `~/.codex/skills/SR-SKILLS-SYNC.md`: Codex is the canonical source — change it there first, then mirror to `~/.claude/` with the mappings in that file, and keep repo-specific names out of this global skill.

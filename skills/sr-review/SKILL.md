@@ -596,3 +596,7 @@ Never emit a fixed 9-section skeleton unless the user explicitly asks for the fu
 Once phase 7 gives a clear conclusion and there are no new material findings, stop; do not append phase 8 or 9 just to complete the structure.
 
 Do not invoke this skill for a small direct question such as `这个变量名可以吗？` unless one of the explicit-naming forms in `Trigger Rules § A` is used. Phrases such as `红队`, `多角度`, or `新上下文` still need a concrete, non-trivial target. When explicit naming is used on a small question, the skill is triggered but defaults to `Light` intensity per the Task Type and Intensity rules.
+
+## Skill Maintenance
+
+When editing this skill, follow `~/.codex/skills/SR-SKILLS-SYNC.md`: Codex is the canonical source — change it there first, then mirror to `~/.claude/` with the mappings in that file, and keep repo-specific names out of this global skill.

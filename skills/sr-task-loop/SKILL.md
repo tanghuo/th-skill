@@ -160,13 +160,28 @@ If the task's validation is too broad or stale:
 - run the narrowest command that directly checks the changed behavior
 - explain the substitution in the completion log
 
-Validation layers, from narrow to broad:
+Select a verification tier by what the change actually touches. There are two axes, not one linear gradient.
 
-- pure unit tests for new helpers
-- package tests for touched behavior
-- integration tests or generated checks when contracts changed
-- static checks when the repo normally requires them
-- manual SQL/doc/schema diff checks when runtime tests are not available
+Scope gradient (narrow to broad; a higher level includes the lower levels' evidence):
+
+- `docs-only` — docs, comments, non-executed text. Evidence: internal consistency, plus a docs build if one exists. Skip runtime, datastore, and tests.
+- `code-unit` — pure in-process logic with no external IO. Evidence: the narrowest unit/package test for the changed behavior. Skip the full suite and integration.
+- `integration` — code that crosses a real boundary (datastore, cache, queue, RPC, socket, filesystem). Evidence: a focused test exercising that boundary; bootstrap only what that test needs. Skip unrelated packages and full-environment runs.
+
+Risk gates (orthogonal; when the change touches one, stack its evidence on top of the applicable scope level — they do not imply each other and do not imply `integration`):
+
+- `schema-or-migration` — schema/DDL or data migration. Evidence: apply against an isolated store and check migration ordering and forward/backward shape. Never run against shared or real data.
+- `money-or-settlement` — amounts, balances, settlement, payout, or idempotency/rerun-sensitive state. Evidence: re-derive the amount unit and the timezone day boundary, and prove idempotency and rerun/retry semantics on isolated data.
+- `ops-or-production` — production data, ops actions, or irreversible external effects. Stay read-only first; mutate only after explicit user authorization. Never mutate silently.
+
+Example: a pure in-process amount calculation stays at `code-unit` scope but must add `money-or-settlement` evidence; do not force `integration` evidence onto it.
+
+Baseline evidence (independent of tier, always applies):
+
+- static/lint/generated checks the repo normally requires;
+- when the target behavior cannot run in the current environment, fall back to manual SQL/doc/schema-diff structural checks and record in the completion log why it degraded — do not silently skip validation.
+
+This table is a generic framework only. Concrete commands, table/column names, money-unit and timezone rules, and environment bootstrap are not written here; take them in fixed priority order from the task's `Validation` field first, then the repo profile as a reusable default, then project memory as a supplementary hint only. Never hard-code repo specifics into this framework.
 
 If a validation command fails:
 
@@ -293,3 +308,7 @@ Keep details in the task file; keep the chat response high-signal.
 - Notes:
   - ...
 ```
+
+## Skill Maintenance
+
+When editing this skill, follow `~/.codex/skills/SR-SKILLS-SYNC.md`: Codex is the canonical source — change it there first, then mirror to `~/.claude/` with the mappings in that file, and keep repo-specific names out of this global skill.

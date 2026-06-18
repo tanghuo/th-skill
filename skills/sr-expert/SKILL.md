@@ -105,6 +105,11 @@ Use an external Expert for adversarial review, architecture or design challenge,
 
 Same-host subagents can count as Experts only when they provide a genuinely independent pass: cold packaged context, no reliance on hidden thread assumptions, and a clear output that the Host Agent will review before integration. If a subagent is just parallel execution with shared assumptions, treat it as a host worker, not an Expert.
 
+When a same-host subagent stands in for an Expert, match it to the lane so it is not silently weaker than the heterogeneous alternative it replaces:
+
+- prefer a different model when one is available; a subagent inheriting the Host's model loses the independence that a heterogeneous Expert provides.
+- match the agent type to the lane. Deep cross-document consistency, adversarial review, and design challenge need a full-capability reviewing/reasoning agent; a breadth-first exploration or excerpt-style search agent will locate code but will not reliably audit it.
+
 When both apply:
 
 1. Keep the task DAG and dependency order from the active `sr-*` skill.
@@ -228,6 +233,7 @@ Include:
 - source plan or acceptance criteria
 - relevant file paths
 - relevant diffs or snippets
+- when the change modifies or replaces an existing file, the pre-change version of every in-scope file, not just the new artifact; "this replacement silently drops content that was in the old file" is structurally invisible to the Expert without that baseline
 - known constraints and out-of-scope items
 - exact question to answer
 - expected output shape
@@ -239,6 +245,7 @@ Exclude:
 - unrelated repo history
 - broad instructions to inspect everything
 - hidden assumptions the Expert cannot verify
+- the Host Agent's own findings, conclusions, or a ranked list of suspected problems; pre-stating them anchors the Expert toward confirming your guesses instead of independently finding what you missed. Give the question and the constraints, not the answer.
 
 For code review, prefer `git diff -- path...`, `git show`, or named file excerpts over the whole repository.
 
@@ -286,7 +293,8 @@ Use these rules:
 
 - Do not promise that raw Expert output will appear live in the user's host chat panel unless the host tool explicitly supports it.
 - Prefer the Expert's streaming output mode when supported by the installed tool or connector.
-- If the host automatically re-invokes the Host Agent when a background worker finishes, rely on that notification instead of polling. Poll only channels the host will not surface on its own (an external CLI run, a remote queue, a log-emitting process).
+- For mid-run visibility into a long Expert run, redirect its output to a file or other pollable channel and read it incrementally. Do not wrap the run in a buffer-until-EOF filter (piping through `tail`, `head`, `less`, `cat`, or similar), which withholds all output until the process exits and makes an actively-running Expert look stalled. Treat that apparent stall as an artifact of the pipe, not evidence to kill the run.
+- If the host automatically re-invokes the Host Agent when a background worker finishes, rely on that notification instead of polling. Poll only channels the host will not surface on its own (an external CLI run, a remote queue, a log-emitting process). Relying on the completion notification does not require giving up an observable log file in the meantime.
 - When you do relay progress, summarize meaningful milestones, tool actions, blockers, and changed-file hints instead of dumping every token.
 - For direct implementation, ask the Expert to report concise milestones (start, file changes, validation start, finish), but treat those as final-output content unless the invocation is actually streamed or pollable.
 - If the host cannot surface live output or the Expert runs as a blocking subprocess, state that live progress is unavailable and report the final captured output once it returns.
@@ -376,6 +384,7 @@ The Host Agent must:
 - verify external worker changes against the allowed write scope, and revert or repair out-of-scope changes while preserving unrelated user work
 - run appropriate validation when code changes are adopted
 - report skipped validation or unavailable expert checks
+- re-run an independent Expert pass after editing the reviewed artifact in response to the findings: once the Host Agent changes the artifact, the original Expert pass is stale and never saw the edited version. Do not close on same-thread self-review; the Host's own fixes can introduce new contradictions (e.g. a freshly added constraint that conflicts with an existing section) that only a fresh independent pass over the changed artifact will catch.
 
 If expert output conflicts with an active `sr-*` skill, follow this order:
 
@@ -400,3 +409,7 @@ When an Expert was used, say:
 When an Expert was considered but skipped, say briefly why only if it matters to the task outcome.
 
 Do not make the final answer about orchestration mechanics unless the user asked about the orchestration itself.
+
+## Skill Maintenance
+
+When editing this skill, follow `~/.codex/skills/SR-SKILLS-SYNC.md`. This skill is host-agnostic and on the no-remap exemption list: keep the Codex and Claude copies byte-identical — do not apply path or tool-name mappings.

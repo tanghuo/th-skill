@@ -252,3 +252,7 @@ Escalate to the user when:
 - the correct behavior is ambiguous and cannot be inferred from code, docs, tests, or schema
 - the fix would require broad unrelated changes
 - validation requires credentials, services, or destructive operations the user has not approved
+
+## Skill Maintenance
+
+When editing this skill, follow `~/.codex/skills/SR-SKILLS-SYNC.md`: Codex is the canonical source — change it there first, then mirror to `~/.claude/` with the mappings in that file, and keep repo-specific names out of this global skill.

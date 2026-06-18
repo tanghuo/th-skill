@@ -247,3 +247,7 @@ When a checkpoint or final review changes the task set, update `00-overview.md` 
 ## Quality Bar
 
 A good run keeps the repo coherent after every task and never hides behind a large final review. Each task should be independently explainable, and the final integration review should be about composition, not discovering basic task misses for the first time.
+
+## Skill Maintenance
+
+When editing this skill, follow `~/.codex/skills/SR-SKILLS-SYNC.md`: Codex is the canonical source — change it there first, then mirror to `~/.claude/` with the mappings in that file, and keep repo-specific names out of this global skill.

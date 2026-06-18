@@ -402,3 +402,7 @@ If verdict is `READY`, say it is ready for `sr-plan-split`.
 If verdict is `NOT-READY`, do not run `sr-plan-split`; list the minimal missing fields needed to become ready.
 
 Keep the output practical and short. The goal is to prevent bad task splitting, not to produce another large report. Short means compressed expression, not reduced coverage: the Source Coverage Map must still account for every source item even when the companion is far shorter than the original.
+
+## Skill Maintenance
+
+When editing this skill, follow `~/.codex/skills/SR-SKILLS-SYNC.md`: Codex is the canonical source — change it there first, then mirror to `~/.claude/` with the mappings in that file, and keep repo-specific names out of this global skill.

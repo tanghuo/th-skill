@@ -397,3 +397,7 @@ A good split makes a future agent less likely to:
 - mix unrelated changes
 - forget downstream rebuilds or generated artifacts
 - lose the distinction between product decision, implementation fact, and residual risk
+
+## Skill Maintenance
+
+When editing this skill, follow `~/.codex/skills/SR-SKILLS-SYNC.md`: Codex is the canonical source — change it there first, then mirror to `~/.claude/` with the mappings in that file, and keep repo-specific names out of this global skill.
