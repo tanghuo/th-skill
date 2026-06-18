@@ -46,6 +46,7 @@ Read:
 
 - `/Users/chenxitang/.codex/skills/sr-task-loop/SKILL.md`
 - `/Users/chenxitang/.codex/skills/sr-review/SKILL.md`
+- `/Users/chenxitang/.codex/skills/sr-expert/SKILL.md` when Expert Strict Mode is requested
 
 Use `sr-task-loop` as the unit of execution. This runner controls ordering, checkpoints, and final integration review.
 
@@ -57,6 +58,7 @@ Expected inputs:
 - optional scope, such as `all`, `next`, `range:3-5`, or a named phase
 - optional stop condition, such as stop after first blocker, stop after N tasks, or run until all P1 tasks complete
 - optional subagent authorization
+- optional Expert Strict Mode when the user asks for `sr-expert`, external Expert, multi-model review, or a stricter one-stop runner flow
 
 Default behavior:
 
@@ -64,6 +66,7 @@ Default behavior:
 - stop at blockers that require user/product/external input
 - after a meaningful group of tasks, run checkpoint review
 - after all selected tasks complete, run final integration review
+- when Expert Strict Mode is enabled, pass Expert Strict Gate into each `sr-task-loop` and add Expert cold review to checkpoint and final integration gates
 
 ## Runner State
 
@@ -120,12 +123,15 @@ Do not skip a pending prerequisite merely because a later task looks easier.
 
 Apply `sr-task-loop` to the selected task.
 
+If Expert Strict Mode is enabled, pass it into the single-task loop. The runner should not postpone task-local Expert findings until the end of the batch.
+
 The runner should not dilute the single-task loop. Each task still needs:
 
 - implementation
 - validation
 - spec review
 - code review
+- Expert Strict Gate when enabled
 - repair
 - task-file status update
 
@@ -161,6 +167,8 @@ If checkpoint review finds material issues:
 - otherwise create or update a task file for the fix
 - do not blindly continue into dependent tasks
 
+When Expert Strict Mode is enabled, checkpoint review also includes an Expert cold workspace review over the completed checkpoint scope. Ask the Expert to start from `git status`, `git diff`, and the changed-file list, then focus on whether the completed tasks compose correctly. Accepted Expert findings must be fixed directly when scoped and safe, or captured as task files before dependent work continues.
+
 ### 5. Final Integration Review
 
 After selected tasks complete, perform a final review over the whole selected change.
@@ -184,6 +192,44 @@ For plan/doc-only work, review:
 
 Say `未发现新的实质问题` only after this integration review finds no material issue.
 
+When Expert Strict Mode is enabled, final integration review also requires an Expert cold workspace review over the whole selected change. Do not report the batch clean until both the Host final integration review and the latest Expert cold review have no accepted material findings.
+
+## Expert Strict Mode
+
+Enable this mode when the user explicitly asks for `sr-expert`, an external Expert, multi-model review, or a stricter one-stop runner flow.
+
+This mode makes the runner stricter without changing ownership:
+
+- the runner remains responsible for dependency order, checkpoint boundaries, and final integration state
+- each selected task is still executed by `sr-task-loop`
+- `sr-task-loop` receives Expert Strict Gate and must not mark a task completed while its latest Expert cold review has accepted material findings
+- checkpoint and final integration reviews add an Expert cold workspace review, not just Host self-review
+- the Host Agent checks Expert findings against repo facts before accepting, fixing, blocking, or rejecting them
+
+Prefer `sr-expert`'s Cold Workspace Review lane. The Expert should be read-only and should discover context from the repository, starting with `git status`, `git diff`, and changed files. The runner may provide only minimal constraints: selected task scope, checkpoint scope, excluded paths, read-only status, validation expectations, and time budget.
+
+Do not provide the Host Agent's implementation narrative, suspected bugs, ranked findings, or "already checked" claims unless the user explicitly asks for a verification pass instead of independent review.
+
+Loop shape:
+
+```text
+for each selected task:
+  run sr-task-loop with Expert Strict Gate
+  stop on blockers or accepted Expert findings that cannot be fixed locally
+
+after checkpoint boundary:
+  Host checkpoint review
+  Expert cold checkpoint review
+  fix accepted material findings before continuing dependent tasks
+
+after selected tasks complete:
+  Host final integration review
+  Expert cold final integration review
+  fix accepted material findings and re-run affected gates until clean or blocked
+```
+
+If an Expert is unavailable, unauthenticated, unsafe to expose to the repository, or too slow for the user-approved scope, say so and continue only if the user accepts the degraded mode. Do not silently downgrade Expert Strict Mode to Host-only review.
+
 ## Agent-Assisted Execution
 
 Default to using subagents as an execution accelerator when agent tools are available and tasks can be reviewed, investigated, or implemented independently.
@@ -205,6 +251,7 @@ If subagents are unavailable or skipped, run the workflow locally in the main ag
 Stop and report when:
 
 - all selected tasks are completed and final integration review is clean
+- if Expert Strict Mode is enabled, the latest Expert final integration review has no accepted material findings
 - a blocker requires user/product/external input
 - validation fails for a reason that cannot be fixed locally
 - the task graph is inconsistent
@@ -220,6 +267,7 @@ While running:
 - short updates every meaningful step
 - current task id
 - validation/checkpoint status
+- Expert Strict Mode pass status when enabled
 - blocker status
 
 Final answer:
@@ -228,6 +276,7 @@ Final answer:
 - blocked tasks, if any
 - validation run
 - checkpoint/final review result
+- Expert Strict Mode result when enabled
 - changed files or task files updated
 - next recommended action
 
@@ -242,6 +291,7 @@ When a checkpoint or final review changes the task set, update `00-overview.md` 
 - material integration findings
 - fixes applied or new tasks created
 - validation summary
+- Expert Strict Mode result when enabled
 - remaining blockers
 
 ## Quality Bar

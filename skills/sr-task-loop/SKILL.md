@@ -18,6 +18,7 @@ read task
 -> validate
 -> spec review
 -> code review
+-> expert strict gate when requested or passed by runner
 -> repair
 -> repeat until no material task-local issues remain
 -> update task status and completion log
@@ -52,6 +53,8 @@ Read `/Users/chenxitang/.codex/skills/sr-review/SKILL.md` before the review phas
 
 Also use any domain-specific skill that clearly applies to the touched code, such as Go abstraction, database discipline, naming discipline, or fail-fast wiring. Keep domain skills subordinate to the task scope.
 
+When the user explicitly asks for `sr-expert`, an external Expert, multi-model review, or when `sr-task-runner` passes Expert Strict Mode into this task, also read `/Users/chenxitang/.codex/skills/sr-expert/SKILL.md` and enable the Expert Strict Gate below.
+
 ## Inputs
 
 Expected task file fields:
@@ -69,6 +72,10 @@ Expected task file fields:
 - `Review Checklist`
 - `Open Questions`
 - `Completion Log`
+
+Optional execution modifiers:
+
+- Expert Strict Gate enabled by the user or by `sr-task-runner`
 
 If fields are missing, reconstruct enough from the task and source plan to proceed. If the missing field creates a material ambiguity, stop and ask or mark the task blocked.
 
@@ -89,7 +96,7 @@ Before editing implementation files:
 After success:
 
 - mark `completed`
-- record changed files, validation run, review result, and residual risks
+- record changed files, validation run, review result, Expert Strict Gate result when enabled, and residual risks
 
 When blocked:
 
@@ -228,7 +235,38 @@ Treat as non-material unless it affects execution:
 
 If code review finds material issues, repair and re-run validation.
 
-### 7. Update Task File
+### 7. Expert Strict Gate
+
+Enable this gate when the user explicitly asks for `sr-expert`, an external Expert, multi-model review, or when `sr-task-runner` passes Expert Strict Mode into this task.
+
+This gate is task-local. It is not a replacement for the runner's checkpoint or final integration review.
+
+Use `sr-expert`'s Cold Workspace Review lane by default when the Expert can safely read the repository or a scoped worker copy. Ask the Expert to review the current task result read-only, starting from `git status`, `git diff`, and the changed-file list, then to build its own context from repo facts.
+
+Host context to the Expert should be minimal:
+
+- task file path and frozen task id
+- frozen task scope and acceptance criteria only when needed to identify the task target
+- read-only constraint
+- excluded paths or forbidden actions, if any
+- validation expectations or time budget, if relevant
+
+Do not send the Host Agent's implementation summary, suspected bugs, ranked findings, or "already checked" claims unless the user explicitly asks for verification rather than independent review.
+
+Loop rule:
+
+1. Run Host spec review and code review first.
+2. Fix Host material findings and re-run relevant validation.
+3. Run the Expert cold workspace review.
+4. Check each Expert finding against repo facts.
+5. Repair accepted material Expert findings and re-run relevant validation.
+6. Re-run the Expert cold workspace review after any Host repair caused by Expert findings.
+
+Do not mark the task `completed` while the latest Expert cold workspace review still has accepted material findings. If the same accepted Expert finding repeats after two repair attempts, or the correct behavior cannot be inferred locally, mark the task blocked with the exact reason.
+
+If the Expert is unavailable, unauthenticated, unsafe to expose to the repository, or too slow for the user-approved scope, say so and continue only if the user accepts the degraded mode. Do not silently downgrade the Expert Strict Gate to Host-only review.
+
+### 8. Update Task File
 
 When the task-local loop is clean:
 
@@ -239,6 +277,7 @@ When the task-local loop is clean:
   - validation commands and outcomes
   - spec review outcome
   - code review outcome
+  - Expert Strict Gate outcome, when enabled
   - residual risks or skipped validation
 
 If blocked:
@@ -246,7 +285,7 @@ If blocked:
 - set `Status: blocked`
 - append blocker details and required owner/input
 
-### 8. Stop Condition
+### 9. Stop Condition
 
 Stop when:
 
@@ -254,6 +293,7 @@ Stop when:
 - validation passed or skipped validation is non-material and disclosed
 - spec review finds no material task-local issue
 - code review finds no material task-local issue
+- if the Expert Strict Gate is enabled, the latest Expert cold workspace review has no accepted material finding
 - task file is updated
 
 Say `未发现新的实质问题` for the task-local review. Do not claim the whole feature is perfect.
@@ -282,6 +322,7 @@ During execution, provide short progress updates:
 - implementation area
 - validation running
 - review finding/fix status
+- if the Expert Strict Gate is enabled, Expert pass status or skip reason
 
 Final answer:
 
@@ -289,6 +330,7 @@ Final answer:
 - changed files
 - validation result
 - review result
+- Expert Strict Gate result when enabled
 - next suggested task if obvious
 
 Keep details in the task file; keep the chat response high-signal.
@@ -305,6 +347,7 @@ Keep details in the task file; keep the chat response high-signal.
   - command: result
 - Spec review: no material gaps | gaps fixed | blocked by ...
 - Code review: no material issues | issues fixed | residual risk ...
+- Expert strict gate: not enabled | no accepted material findings | findings fixed | blocked by ...
 - Notes:
   - ...
 ```

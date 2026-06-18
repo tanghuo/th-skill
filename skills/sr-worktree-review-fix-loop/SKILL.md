@@ -16,6 +16,7 @@ Stable success criteria:
 - Review the intended worktree changes, not an unrelated old task.
 - Freeze material findings before editing.
 - Prefer clean-context subagents as an execution accelerator for non-trivial review and repair work when agent tools are available.
+- When the user asks for `sr-expert`, external expert, multi-model, or stricter one-stop review, add an Expert Strict Gate instead of treating the Expert as a one-off side note.
 - Fix material defects directly when the user asked for the loop.
 - Re-review the original findings and the repair diff.
 - Stop when no new material issues remain; do not chase cosmetic preferences forever.
@@ -54,6 +55,8 @@ Apply `sr-review` as the review method. When the target is code diff, commit, or
 - no phase-table output unless the user asks for it
 
 This wrapper controls the loop mechanics; `sr-review` controls review scrutiny.
+
+When the user explicitly asks for `sr-expert`, an external Expert, multi-model review, or a stricter one-stop loop, also read `/Users/chenxitang/.codex/skills/sr-expert/SKILL.md` and enable the Expert Strict Gate below.
 
 ## Target Resolution
 
@@ -179,6 +182,37 @@ Avoid subagents for:
 
 If subagents are unavailable or skipped, continue in the main agent and say briefly why. Treat subagent output as independent evidence and candidate changes to review, merge, and validate, not as an automatic replacement for the main review.
 
+### 2.6. Expert Strict Gate
+
+Enable this gate when the user explicitly asks for `sr-expert`, an external Expert, multi-model review, or a stricter one-stop loop.
+
+The strict gate turns the loop into:
+
+```text
+Host review
+-> Host repair
+-> validation
+-> Expert cold workspace review
+-> Host repair of accepted Expert findings
+-> validation
+-> repeat Expert cold workspace review until clean or blocked
+```
+
+Use `sr-expert`'s Cold Workspace Review lane by default. The Expert should be read-only and should start from `git status`, `git diff`, and the changed-file list instead of from the Host Agent's implementation summary.
+
+Host context to the Expert should stay minimal:
+
+- the frozen review target
+- read-only constraint
+- excluded paths or forbidden actions, if any
+- validation expectations or time budget, if relevant
+
+Do not send the Host Agent's own suspected bugs, ranked findings, implementation rationale, or "already checked" claims unless the user explicitly asks for verification rather than independent review.
+
+Treat Expert findings as material only after checking them against repo facts. Accepted Expert findings enter the same repair queue as Host findings.
+
+If the Expert is unavailable, unauthenticated, unsafe to expose to the repository, or too slow for the user-approved scope, say so and continue only if the user accepts the degraded mode. Do not silently downgrade the Expert Strict Gate to Host-only review.
+
 ### 3. Repair
 
 When material findings exist and the user asked for the loop, fix them directly.
@@ -215,10 +249,13 @@ After edits, re-check:
 - whether tests and docs still match the changed behavior
 - whether generated files or schemas need syncing
 - if subagents were used, whether their findings are fixed, false positives, or accepted residual risks
+- if the Expert Strict Gate is enabled, whether the latest Expert cold workspace review has no accepted material findings
 
 If new material findings remain, loop back to Repair.
 
-Stop when the review finds no new material issues. Say `未发现新的实质问题`, not `绝对没有问题`.
+When the Expert Strict Gate is enabled, do not stop on Host self-review alone after a repair. Stop only after the Host re-review and the latest Expert cold workspace review both have no accepted material findings.
+
+Stop when the active review gates find no new material issues. Say `未发现新的实质问题`, not `绝对没有问题`.
 
 ## Output Shape
 
@@ -228,12 +265,14 @@ During the work, keep updates short:
 - the material issue being fixed
 - which validation is running
 - whether another pass is needed
+- if the Expert Strict Gate is enabled, which Expert pass is running or why it was skipped
 
 Final response:
 
 - state whether the loop stopped because no material issues remain or because of a blocker
 - summarize the fixes
 - list validation run and any skipped validation
+- report the Expert Strict Gate result when enabled
 - mention residual non-material risks only if useful
 
 Do not print the full workflow or phase checklist unless the user asks for it.
@@ -244,11 +283,13 @@ Stop the loop when:
 
 - all frozen material findings are fixed or intentionally accepted
 - the latest re-review finds no new material defects
+- if the Expert Strict Gate is enabled, the latest Expert cold workspace review has no accepted material findings
 - remaining points are cosmetic, optional, or speculative
 
 Escalate to the user when:
 
 - the same material concern repeats after two repair attempts
+- the same Expert finding repeats after two repair attempts and the correct fix is not obvious from code, docs, tests, or schema
 - the correct behavior is ambiguous and cannot be inferred from code, docs, tests, or schema
 - the fix would require broad unrelated changes
 - validation requires credentials, services, or destructive operations the user has not approved
