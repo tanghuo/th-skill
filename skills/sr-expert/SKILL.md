@@ -331,6 +331,60 @@ Adapter examples:
   - use the host's native subagent or task tool instead of pretending it is an external CLI
   - still package the context cold and review the result before integration
 
+## Claude/Codex Adapter Preference
+
+In this environment family, optimize for the two real Expert paths first instead of designing for an abstract unknown CLI.
+
+### Codex Host -> Claude CLI Expert
+
+Default adapter for `sr-expert` when Codex is the Host Agent and Claude CLI is available.
+
+Preflight:
+
+- run `command -v claude` and inspect `claude --help`
+- prefer `claude -p` non-interactive mode for review lanes
+- if the installed CLI supports it, prefer `--output-format stream-json`; when the CLI requires a paired verbosity flag for stream JSON, include it
+- if supported, add partial/event visibility flags such as `--include-partial-messages` or `--include-hook-events` for long reviews
+- for packaged read-only review that does not require repo tools, disable tools with the CLI's supported mechanism, for example `--tools ""`
+- for cold workspace review, expose only the reviewed directory and allow only read-only inspection tools where the CLI supports tool scoping
+- use a debug/transcript/log file when the CLI supports one and the run may be long
+
+Invocation preference:
+
+1. `claude -p --verbose --output-format stream-json ...` with partial messages/events when available, captured to a pollable log or surfaced by the Host tool. Include `--verbose` only when the installed CLI requires or supports it.
+2. `claude -p --output-format json ...` plus a debug/transcript/log file when stream JSON is unavailable.
+3. `claude -p ...` in TTY-visible mode when the Host can surface it safely.
+4. Blocking `claude -p ...` only when the above are unavailable or unsafe, and only after stating that this run is `blocking capture`.
+
+Progress handling:
+
+- parse or skim stream events for observable progress, not hidden chain-of-thought
+- relay only milestones: start, files or sections inspected, tools/commands used, emerging material findings, blockers, and finish
+- always keep the final complete Claude output for integration review
+
+### Claude Host -> Codex Expert
+
+Default adapter when Claude is the Host Agent and Codex is the Expert.
+
+Preflight:
+
+- prefer a Codex app, connector, thread, or worktree tool when the host exposes one, because it provides the clearest completion signal and workspace isolation
+- otherwise inspect `codex --help` or the installed Codex CLI/connector docs for non-interactive mode, streaming or JSON output, transcript/log support, worktree support, and tool scoping
+- verify whether the Codex path shares the Host filesystem; if it does not, require a textual review report, unified diff, or Integration Diff instead of assuming local files changed
+
+Invocation preference:
+
+1. Codex app/thread/worktree connector with explicit task package and completion notification.
+2. Codex CLI non-interactive mode with streaming/JSON/transcript output when available.
+3. Codex CLI with pollable log/transcript.
+4. Blocking Codex CLI only when the above are unavailable or unsafe, and only after stating that this run is `blocking capture`.
+
+Integration handling:
+
+- for app/thread based Codex Experts, treat their final message or produced diff as the Integration Diff
+- for shared filesystem worktrees, inspect `git status`, changed files, and diff before accepting anything
+- do not assume a Codex connector has the same auth, filesystem, or tool permissions as the Claude Host
+
 ## Progress Streaming
 
 External expert runs can feel stalled because command output may be buffered, hidden by the host UI, or only visible to the Host Agent.
