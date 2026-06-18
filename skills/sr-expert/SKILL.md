@@ -25,10 +25,22 @@ Examples:
 
 - Codex as Host Agent, Claude CLI as Expert.
 - Claude as Host Agent, Codex CLI/app/thread as Expert.
-- Codex as Host Agent, a Codex subagent as Expert.
-- Claude as Host Agent, a Claude subagent or Task as Expert.
+- Codex or Claude as Host Agent, a same-host subagent only as an explicitly accepted degraded fallback, not as the default Expert.
 
 The Host Agent remains responsible for final judgment, edits, validation, and user-facing conclusions.
+
+## External-First Invariant
+
+The highest-value Expert is external or heterogeneous: a different model family, CLI, app-backed connector, separate runtime, or other execution context outside the Host Agent's native subagent pool.
+
+When the user explicitly names `sr-expert`, an external Expert, a heterogeneous model, multi-model review, or when an active `sr-*` workflow enables Expert Strict Mode:
+
+- first attempt an external or heterogeneous Expert path through the preflight rules below;
+- do not silently satisfy the request with a same-host subagent;
+- if no external or heterogeneous path is available, authenticated, safe, or timely, stop and report that the Expert lane is unavailable unless the user explicitly accepts degraded same-host fallback;
+- if degraded fallback is accepted, label it as `same-host fallback` in task logs and user-facing output.
+
+Same-host subagents can still be useful, but they are host workers or degraded reviewers by default. They do not provide the main value of `sr-expert`: heterogeneous external judgment.
 
 ## Safety Invariants
 
@@ -90,10 +102,11 @@ Use this decision sequence:
 
 1. Apply the Cost Gate and decide whether an Expert is justified.
 2. Choose one lane: cold workspace review, packaged read-only review, adversarial challenge, patch proposal, comparison pass, or external implementation.
-3. Select the adapter path and run preflight: availability, authentication, permissions, isolation, streaming, and cost.
+3. Select the external or heterogeneous adapter path and run preflight: availability, authentication, permissions, isolation, streaming, and cost. In explicit `sr-expert` or Expert Strict Mode, this preflight happens before considering same-host fallback.
 4. For cold workspace review, give the Expert a minimal task and let it inspect the repository facts itself. For packaged lanes, build the Context Package with only the information the Expert needs. If repository or directory exposure may include secrets, get explicit user consent before invoking the Expert.
 5. Invoke the Expert using the narrowest feasible workspace, connector scope, or artifact package.
-6. Treat the Expert result as evidence, not authority: review it, apply only accepted changes, validate in the Host Workspace, and report residual risk.
+6. If the external or heterogeneous Expert path is unavailable and fallback would still be useful, ask whether to continue with degraded same-host fallback. Do not downgrade silently.
+7. Treat the Expert result as evidence, not authority: review it, apply only accepted changes, validate in the Host Workspace, and report residual risk.
 
 ## Expert vs Host Subagent
 
@@ -103,12 +116,13 @@ Use the Host Agent's native parallelism (Codex subagents, Claude Tasks/subagents
 
 Use an external Expert for adversarial review, architecture or design challenge, diff risk scanning, alternative implementation proposals, bounded patches on an isolated surface, or tightly scoped direct implementation by an external CLI/agent when the user wants that Expert to edit code.
 
-Same-host subagents can count as Experts only when they provide a genuinely independent pass: cold packaged context, no reliance on hidden thread assumptions, and a clear output that the Host Agent will review before integration. If a subagent is just parallel execution with shared assumptions, treat it as a host worker, not an Expert.
+Same-host subagents do not satisfy the normal `sr-expert` contract. They may be used as degraded fallback only after an external or heterogeneous path was attempted or judged unavailable, and only after the user explicitly accepts that downgrade. Even then, require a genuinely independent pass: cold packaged context, no reliance on hidden thread assumptions, and a clear output that the Host Agent will review before integration. If a subagent is just parallel execution with shared assumptions, treat it as a host worker, not an Expert.
 
-When a same-host subagent stands in for an Expert, match it to the lane so it is not silently weaker than the heterogeneous alternative it replaces:
+When a same-host subagent is used as degraded fallback, match it to the lane so it is not silently weaker than the heterogeneous alternative it replaces:
 
 - prefer a different model when one is available; a subagent inheriting the Host's model loses the independence that a heterogeneous Expert provides.
 - match the agent type to the lane. Deep cross-document consistency, adversarial review, and design challenge need a full-capability reviewing/reasoning agent; a breadth-first exploration or excerpt-style search agent will locate code but will not reliably audit it.
+- record the fallback in the task log or final output as `same-host fallback`, including why no external or heterogeneous Expert was used and whether the user accepted the downgrade.
 
 When both apply:
 
@@ -290,6 +304,8 @@ Preflight:
 6. Keep invocation scoped to the concrete Expert command or connector action. Do not request broad permanent permission unless the user explicitly wants that tradeoff.
 7. If the Expert is unavailable or approval is denied, mark the lane unavailable and continue with the primary `sr-*` workflow.
 
+Explicit `sr-expert` and Expert Strict Mode add one stricter rule: after an external or heterogeneous Expert path is marked unavailable, stop and ask whether to continue with degraded same-host fallback. Do not continue as if same-host review satisfied the Expert gate.
+
 Permission rule:
 
 - Host approval/escalation may fix credential or network access; it does not by itself constrain what the Expert can read or write (see Safety Invariants).
@@ -309,6 +325,7 @@ Adapter examples:
   - invocation: prefer a new Codex thread, Codex worktree, or non-interactive Codex CLI run with a self-contained Context Package; if the Codex path is app/thread based and does not share the host filesystem, require a textual Integration Diff instead of expecting local files to change
   - common hazard: Claude's shell/session may not share Codex app login state, API-key environment, workspace trust, or connector permissions
 - Same-host subagent:
+  - degraded fallback only; use it only after external or heterogeneous preflight fails or is unsafe, and after the user accepts the downgrade
   - use the host's native subagent or task tool instead of pretending it is an external CLI
   - still package the context cold and review the result before integration
 
@@ -452,6 +469,7 @@ When an Expert was used, say:
 
 - which lane was used
 - which adapter or Expert path was used
+- whether it was external/heterogeneous or a user-accepted same-host fallback
 - what the Expert materially found or changed
 - what was accepted, rejected, or still uncertain
 - what validation was run or skipped
