@@ -7,7 +7,7 @@ description: Use inside sr-* workflows when an external expert agent, CLI, or he
 
 ## Goal
 
-Add a disciplined external-expert lane to the `sr-*` workflow: decide when to involve an external expert, how to package the request, how to run it safely, and how to integrate the result without weakening the Host Agent's ownership.
+Add a disciplined external-expert lane to the `sr-*` workflow: decide when to involve an external expert, when to preserve cold independence instead of packaging context, how to run it safely, and how to integrate the result without weakening the Host Agent's ownership.
 
 It is intentionally conservative. External experts should reduce risk or latency, not become ceremony.
 
@@ -48,7 +48,7 @@ Two rules apply to every lane below. They are stated once here and referenced, n
 - `sr-task-runner` owns task DAG execution.
 - `sr-worktree-review-fix-loop` owns iterative dirty-worktree review and repair.
 
-`sr-expert` only answers: whether an external expert is worth invoking, which lane to use, what context package to send, which adapter or CLI path is safe and available, and how to verify and integrate the response.
+`sr-expert` only answers: whether an external expert is worth invoking, which lane to use, whether to use a cold workspace entry or a packaged context, which adapter or CLI path is safe and available, and how to verify and integrate the response.
 
 Implementation note: this skill uses host-agnostic primitives for dispatch decisions ("host-appropriate mechanism", "the host's native subagent or task tool"). Concrete CLI names appear only as symmetric adapter examples, not as host-specific dispatch requirements. Its copies across host skill directories may therefore be kept byte-identical without per-host tool-name or path remapping — unlike sr-* skills that hardcode host tools.
 
@@ -89,9 +89,9 @@ Do not invoke just because subagents or an Expert CLI happen to be available.
 Use this decision sequence:
 
 1. Apply the Cost Gate and decide whether an Expert is justified.
-2. Choose one lane: read-only review, adversarial challenge, patch proposal, comparison pass, or external implementation.
+2. Choose one lane: cold workspace review, packaged read-only review, adversarial challenge, patch proposal, comparison pass, or external implementation.
 3. Select the adapter path and run preflight: availability, authentication, permissions, isolation, streaming, and cost.
-4. Build the Context Package with only the information the Expert needs; if repository or directory exposure may include secrets, get explicit user consent before invoking the Expert.
+4. For cold workspace review, give the Expert a minimal task and let it inspect the repository facts itself. For packaged lanes, build the Context Package with only the information the Expert needs. If repository or directory exposure may include secrets, get explicit user consent before invoking the Expert.
 5. Invoke the Expert using the narrowest feasible workspace, connector scope, or artifact package.
 6. Treat the Expert result as evidence, not authority: review it, apply only accepted changes, validate in the Host Workspace, and report residual risk.
 
@@ -123,7 +123,34 @@ Never assign the same file set to two writers. If a host worker and an Expert to
 
 Choose one lane. Do not send a vague "look at this" request.
 
-### 1. Read-Only Review
+### 1. Cold Workspace Review
+
+Default to this lane for code changes, dirty worktree review, worker output review, or "another agent already implemented this; independently review it" requests when the Expert can safely read the repository or a scoped worker copy.
+
+This lane exists because the main value of a heterogeneous Expert is often independent context discovery. If the Host Agent pre-summarizes the change, selects only snippets, or explains its own suspicions, the Expert becomes a second reader of the Host's framing instead of an independent reviewer.
+
+Ask the Expert to:
+
+- start from `git status`, `git diff`, and the changed-file list
+- build its own context from the repository, including callers, consumers, tests, schemas, generated contracts, and nearby conventions as needed
+- avoid relying on hidden thread context or the Host Agent's implementation summary
+- return material findings only
+- remain read-only unless a separate implementation lane was chosen
+
+Host-provided context should be minimal:
+
+- hard constraints: read-only, forbidden paths, excluded files, time budget, validation expectations, security or privacy boundaries
+- the exact review target: current worktree, a branch, a commit range, a task file, or a worker workspace
+- no Host conclusions, suspected bugs, implementation rationale, ranked risks, or "already checked" claims unless the user explicitly wants a verification pass rather than an independent review
+
+Use packaged read-only review instead when:
+
+- the Expert cannot safely access the repository or worker copy
+- the target is a standalone artifact rather than code in a repository
+- exposing the repository is not acceptable
+- the question is intentionally narrow, such as checking one API contract, one migration, or one document section
+
+### 2. Packaged Read-Only Review
 
 Use for serious diffs, plans, task outputs, or generated artifacts.
 
@@ -135,7 +162,7 @@ Ask for:
 - no edits
 - no praise or restatement unless needed to justify a finding
 
-### 2. Adversarial Challenge
+### 3. Adversarial Challenge
 
 Use for designs, architecture choices, migration plans, and high-risk assumptions.
 
@@ -146,7 +173,7 @@ Ask the Expert to:
 - find missing rollback, compatibility, or validation steps
 - propose safer alternatives only when materially different
 
-### 3. Patch Proposal
+### 4. Patch Proposal
 
 Use only for an isolated file set or module.
 
@@ -159,7 +186,7 @@ Ask for:
 
 The Host Agent must review and apply the patch deliberately. Do not treat a generated patch as accepted just because it applies.
 
-### 4. Comparison Pass
+### 5. Comparison Pass
 
 Use when two approaches are plausible.
 
@@ -170,7 +197,7 @@ Ask for:
 - failure modes
 - a recommendation with confidence and assumptions
 
-### 5. External Implementation
+### 6. External Implementation
 
 Use when the user wants the Expert to directly edit code. Treat this as an external worker lane, not another cursor in the main working tree.
 
@@ -224,7 +251,7 @@ After it returns:
 
 ## Context Package
 
-Before invoking an Expert, prepare a compact package.
+Before invoking an Expert in a packaged lane, prepare a compact package. For cold workspace review, do not prepare a rich Context Package; send a minimal entry prompt and let the Expert discover the relevant repo facts.
 
 Include:
 
@@ -247,7 +274,7 @@ Exclude:
 - hidden assumptions the Expert cannot verify
 - the Host Agent's own findings, conclusions, or a ranked list of suspected problems; pre-stating them anchors the Expert toward confirming your guesses instead of independently finding what you missed. Give the question and the constraints, not the answer.
 
-For code review, prefer `git diff -- path...`, `git show`, or named file excerpts over the whole repository.
+For code or worktree review, prefer cold workspace review when the Expert can safely read the repository or a scoped worker copy. Ask it to start from `git status` and `git diff`, then follow the context it needs. Use `git diff -- path...`, `git show`, or named file excerpts only when repository access is unsafe, unavailable, or intentionally narrower than the review goal.
 
 ## Expert CLI Preflight And Invocation
 
@@ -302,7 +329,30 @@ Use these rules:
 
 ## Prompt Templates
 
-### Read-Only Review
+### Cold Workspace Review
+
+```text
+You are an independent external reviewer with no prior thread context.
+
+Review target:
+- repository or worker workspace: ...
+- scope: current worktree changes / branch ... / commit range ... / task output ...
+
+Constraints:
+- read-only review
+- do not edit files
+- do not assume hidden thread context
+- ignore any implementation intent unless it is directly visible in the repo, task file, or diff
+- excluded paths, if any: ...
+
+Task:
+Start from git status, git diff, and the changed-file list. Build your own context from the repository: callers, consumers, tests, schemas, generated contracts, nearby conventions, and validation paths as needed.
+
+Return only material findings. For each finding include severity, file/line if available, why it matters, and a minimal fix direction.
+If no material issue is found, say so and list residual risks.
+```
+
+### Packaged Read-Only Review
 
 ```text
 You are an external reviewer with no prior thread context.
