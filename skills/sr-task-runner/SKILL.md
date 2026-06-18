@@ -58,7 +58,7 @@ Expected inputs:
 - optional scope, such as `all`, `next`, `range:3-5`, or a named phase
 - optional stop condition, such as stop after first blocker, stop after N tasks, or run until all P1 tasks complete
 - optional subagent authorization
-- optional Expert Strict Mode when the user asks for `sr-expert`, external Expert, multi-model review, or a stricter one-stop runner flow
+- optional Expert Strict Mode when the user explicitly asks for `sr-expert`, external Expert, multi-model review, an independent/heterogeneous model review, or `Expert Strict Mode`
 
 Default behavior:
 
@@ -167,7 +167,7 @@ If checkpoint review finds material issues:
 - otherwise create or update a task file for the fix
 - do not blindly continue into dependent tasks
 
-When Expert Strict Mode is enabled, checkpoint review also includes an Expert cold workspace review over the completed checkpoint scope. Ask the Expert to start from `git status`, `git diff`, and the changed-file list, then focus on whether the completed tasks compose correctly. Accepted Expert findings must be fixed directly when scoped and safe, or captured as task files before dependent work continues.
+When Expert Strict Mode is enabled, checkpoint review also includes an Expert cold workspace review over the completed checkpoint scope. Ask the Expert to start from `git status`, `git diff`, and the changed-file list, then focus on whether the completed tasks compose correctly. Accepted Expert findings that affect checkpoint composition, correctness, release safety, or any downstream task must be fixed directly when scoped and safe, or converted into blocking task files that complete before dependent work continues. Only findings explicitly accepted as backlog or residual risk may be deferred, and the checkpoint log must say why they do not block downstream work.
 
 ### 5. Final Integration Review
 
@@ -194,9 +194,13 @@ Say `未发现新的实质问题` only after this integration review finds no ma
 
 When Expert Strict Mode is enabled, final integration review also requires an Expert cold workspace review over the whole selected change. Do not report the batch clean until both the Host final integration review and the latest Expert cold review have no accepted material findings.
 
+Accepted Expert final-review findings must be fixed and re-reviewed before reporting the selected batch clean. If a finding is intentionally deferred, record it as backlog or residual risk only after deciding it does not invalidate the selected batch's correctness, release safety, or stated acceptance scope.
+
 ## Expert Strict Mode
 
-Enable this mode when the user explicitly asks for `sr-expert`, an external Expert, multi-model review, or a stricter one-stop runner flow.
+Enable this mode only when the user explicitly asks for `sr-expert`, an external Expert, multi-model review, an independent/heterogeneous model review, or `Expert Strict Mode`.
+
+Do not infer this mode merely from requests for a stricter runner, one-stop execution, more careful review, deeper local review, or a stronger host-only loop. Those requests should make the normal runner stricter without adding external Expert cost, authentication, repository exposure, or waiting time.
 
 This mode makes the runner stricter without changing ownership:
 
@@ -221,6 +225,7 @@ after checkpoint boundary:
   Host checkpoint review
   Expert cold checkpoint review
   fix accepted material findings before continuing dependent tasks
+  convert dependency-affecting findings into blocking tasks, not backlog
 
 after selected tasks complete:
   Host final integration review

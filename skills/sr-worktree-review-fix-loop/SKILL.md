@@ -16,7 +16,7 @@ Stable success criteria:
 - Review the intended worktree changes, not an unrelated old task.
 - Freeze material findings before editing.
 - Prefer clean-context subagents as an execution accelerator for non-trivial review and repair work when agent tools are available.
-- When the user asks for `sr-expert`, external expert, multi-model, or stricter one-stop review, add an Expert Strict Gate instead of treating the Expert as a one-off side note.
+- When the user explicitly asks for `sr-expert`, external Expert, multi-model review, an independent/heterogeneous model review, or `Expert Strict Gate`, add an Expert Strict Gate instead of treating the Expert as a one-off side note.
 - Fix material defects directly when the user asked for the loop.
 - Re-review the original findings and the repair diff.
 - Stop when no new material issues remain; do not chase cosmetic preferences forever.
@@ -56,7 +56,7 @@ Apply `sr-review` as the review method. When the target is code diff, commit, or
 
 This wrapper controls the loop mechanics; `sr-review` controls review scrutiny.
 
-When the user explicitly asks for `sr-expert`, an external Expert, multi-model review, or a stricter one-stop loop, also read `/Users/chenxitang/.codex/skills/sr-expert/SKILL.md` and enable the Expert Strict Gate below.
+When the user explicitly asks for `sr-expert`, an external Expert, multi-model review, an independent/heterogeneous model review, or `Expert Strict Gate`, also read `/Users/chenxitang/.codex/skills/sr-expert/SKILL.md` and enable the Expert Strict Gate below.
 
 ## Target Resolution
 
@@ -184,7 +184,9 @@ If subagents are unavailable or skipped, continue in the main agent and say brie
 
 ### 2.6. Expert Strict Gate
 
-Enable this gate when the user explicitly asks for `sr-expert`, an external Expert, multi-model review, or a stricter one-stop loop.
+Enable this gate only when the user explicitly asks for `sr-expert`, an external Expert, multi-model review, an independent/heterogeneous model review, or `Expert Strict Gate`.
+
+Do not infer this gate merely from requests for a stricter local loop, one-stop review, more careful review, deeper host review, or a stronger host-only workflow. Those requests should make the normal review/fix loop stricter without adding external Expert cost, authentication, repository exposure, or waiting time.
 
 The strict gate turns the loop into:
 

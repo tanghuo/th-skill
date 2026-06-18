@@ -53,7 +53,7 @@ Read `/Users/chenxitang/.codex/skills/sr-review/SKILL.md` before the review phas
 
 Also use any domain-specific skill that clearly applies to the touched code, such as Go abstraction, database discipline, naming discipline, or fail-fast wiring. Keep domain skills subordinate to the task scope.
 
-When the user explicitly asks for `sr-expert`, an external Expert, multi-model review, or when `sr-task-runner` passes Expert Strict Mode into this task, also read `/Users/chenxitang/.codex/skills/sr-expert/SKILL.md` and enable the Expert Strict Gate below.
+When the user explicitly asks for `sr-expert`, an external Expert, multi-model review, an independent/heterogeneous model review, `Expert Strict Gate`, or when `sr-task-runner` passes Expert Strict Mode into this task, also read `/Users/chenxitang/.codex/skills/sr-expert/SKILL.md` and enable the Expert Strict Gate below.
 
 ## Inputs
 
@@ -237,7 +237,7 @@ If code review finds material issues, repair and re-run validation.
 
 ### 7. Expert Strict Gate
 
-Enable this gate when the user explicitly asks for `sr-expert`, an external Expert, multi-model review, or when `sr-task-runner` passes Expert Strict Mode into this task.
+Enable this gate when the user explicitly asks for `sr-expert`, an external Expert, multi-model review, an independent/heterogeneous model review, `Expert Strict Gate`, or when `sr-task-runner` passes Expert Strict Mode into this task.
 
 This gate is task-local. It is not a replacement for the runner's checkpoint or final integration review.
 
@@ -260,7 +260,8 @@ Loop rule:
 3. Run the Expert cold workspace review.
 4. Check each Expert finding against repo facts.
 5. Repair accepted material Expert findings and re-run relevant validation.
-6. Re-run the Expert cold workspace review after any Host repair caused by Expert findings.
+6. Re-run Host spec review and code review over the Expert-driven repair diff before relying on the previous Host review result.
+7. Re-run the Expert cold workspace review after any Host repair caused by Expert findings and after the Host re-review is clean.
 
 Do not mark the task `completed` while the latest Expert cold workspace review still has accepted material findings. If the same accepted Expert finding repeats after two repair attempts, or the correct behavior cannot be inferred locally, mark the task blocked with the exact reason.
 
