@@ -54,8 +54,9 @@ new mapping starts appearing in a skill, update the Claude installer in the same
 
 ## 3. Managed skills
 
-`sr-review`, `sr-task-loop`, `sr-task-runner`, `sr-plan-split`, `sr-design-gate`,
-`sr-split-ready`, `sr-worktree-review-fix-loop`, `sr-expert` (byte-identical exemption).
+`sr-help` (byte-identical exemption), `sr-review`, `sr-task-loop`, `sr-task-runner`,
+`sr-plan-split`, `sr-design-gate`, `sr-split-ready`, `sr-worktree-review-fix-loop`,
+`sr-expert` (byte-identical exemption).
 
 ## 4. Checklist (run after editing any sr-* skill)
 
