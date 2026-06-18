@@ -102,7 +102,7 @@ Use this decision sequence:
 
 1. Apply the Cost Gate and decide whether an Expert is justified.
 2. Choose one lane: cold workspace review, packaged read-only review, adversarial challenge, patch proposal, comparison pass, or external implementation.
-3. Select the external or heterogeneous adapter path and run preflight: availability, authentication, permissions, isolation, streaming, and cost. In explicit `sr-expert` or Expert Strict Mode, this preflight happens before considering same-host fallback.
+3. Select the external or heterogeneous adapter path and run preflight: availability, authentication, permissions, isolation, streaming, observability, and cost. In explicit `sr-expert` or Expert Strict Mode, this preflight happens before considering same-host fallback.
 4. For cold workspace review, give the Expert a minimal task and let it inspect the repository facts itself. For packaged lanes, build the Context Package with only the information the Expert needs. If repository or directory exposure may include secrets, get explicit user consent before invoking the Expert.
 5. Invoke the Expert using the narrowest feasible workspace, connector scope, or artifact package.
 6. If the external or heterogeneous Expert path is unavailable and fallback would still be useful, ask whether to continue with degraded same-host fallback. Do not downgrade silently.
@@ -298,11 +298,12 @@ Preflight:
 
 1. Check whether the Expert is available using the host-appropriate mechanism.
 2. If sandboxing may hide the user's real PATH, credentials, keychain, browser session, or config, confirm availability through the host's approval/escalation mechanism before declaring the Expert unavailable.
-3. Check whether the Expert supports non-interactive prompt mode, read-only mode, scoped directory access, worker worktrees, streaming output, and tool allow/deny lists.
+3. Check whether the Expert supports non-interactive prompt mode, read-only mode, scoped directory access, worker worktrees, streaming output, pollable transcript/log output, and tool allow/deny lists.
 4. If the Expert would see a repository, directory, browser state, or other surface that may contain secrets, get explicit user consent for that exposure before invocation.
 5. If the Expert requires network, authentication, browser state, OAuth, API keys, keychain access, or local app state, treat that as an external capability and use the host's approval flow.
 6. Keep invocation scoped to the concrete Expert command or connector action. Do not request broad permanent permission unless the user explicitly wants that tradeoff.
-7. If the Expert is unavailable or approval is denied, mark the lane unavailable and continue with the primary `sr-*` workflow.
+7. Choose the best available observability mode before invocation: native streaming, PTY-visible run, background run with pollable transcript/log, or blocking capture. Do not start a long Expert run without knowing which mode is in use.
+8. If the Expert is unavailable or approval is denied, mark the lane unavailable and continue with the primary `sr-*` workflow.
 
 Explicit `sr-expert` and Expert Strict Mode add one stricter rule: after an external or heterogeneous Expert path is marked unavailable, stop and ask whether to continue with degraded same-host fallback. Do not continue as if same-host review satisfied the Expert gate.
 
@@ -317,7 +318,8 @@ Adapter examples:
 - Codex Host -> Claude Expert:
   - availability: `command -v claude` and `claude --help`, as supported by the installed CLI
   - auth preflight: `claude auth status`, when supported
-  - invocation: `claude -p ...`, with scoped directories and tool restrictions when supported
+  - observability: inspect `claude --help` for streaming, verbose, output-format, JSON/stream-JSON, TTY, or transcript options before choosing blocking prompt mode
+  - invocation: `claude -p ...`, with scoped directories, tool restrictions, and the best available streaming or transcript mode when supported
   - common hazard: Codex command sandbox may not see Claude OAuth or macOS Keychain state; verify through host escalation before asking the user to log in again
 - Claude Host -> Codex Expert:
   - availability: use the host-provided Codex connector/app/thread tool when available; otherwise inspect whether a Codex CLI is installed and supports non-interactive execution, for example by checking `command -v codex` and the installed tool's help output
@@ -336,12 +338,20 @@ External expert runs can feel stalled because command output may be buffered, hi
 Use these rules:
 
 - Do not promise that raw Expert output will appear live in the user's host chat panel unless the host tool explicitly supports it.
-- Prefer the Expert's streaming output mode when supported by the installed tool or connector.
+- Do not ask the Expert to reveal hidden chain-of-thought. Ask for observable progress instead: phase names, files inspected, commands run, blockers, emerging material findings, confidence changes, and final concise rationale.
+- Prefer the Expert's native streaming or transcript mode when supported by the installed tool or connector.
+- If native streaming is unavailable but a TTY-visible run is safe and supported, prefer that over plain blocking capture for long reviews.
 - For mid-run visibility into a long Expert run, redirect its output to a file or other pollable channel and read it incrementally. Do not wrap the run in a buffer-until-EOF filter (piping through `tail`, `head`, `less`, `cat`, or similar), which withholds all output until the process exits and makes an actively-running Expert look stalled. Treat that apparent stall as an artifact of the pipe, not evidence to kill the run.
+- For external CLI runs expected to take more than a short moment, prefer one of these invocation shapes, in order:
+  1. native streaming or stream-JSON mode, if the CLI exposes one;
+  2. TTY-visible non-interactive mode, if the host can surface it safely;
+  3. background execution whose stdout/stderr or transcript is written to a timestamped file and polled periodically;
+  4. blocking capture only when the first three are unavailable or unsafe.
+- When using a pollable log, announce the log path to the Host Agent's internal notes or task log, poll for meaningful deltas, and summarize milestones instead of dumping raw tokens. Always read the final complete output before integrating.
 - If the host automatically re-invokes the Host Agent when a background worker finishes, rely on that notification instead of polling. Poll only channels the host will not surface on its own (an external CLI run, a remote queue, a log-emitting process). Relying on the completion notification does not require giving up an observable log file in the meantime.
 - When you do relay progress, summarize meaningful milestones, tool actions, blockers, and changed-file hints instead of dumping every token.
 - For direct implementation, ask the Expert to report concise milestones (start, file changes, validation start, finish), but treat those as final-output content unless the invocation is actually streamed or pollable.
-- If the host cannot surface live output or the Expert runs as a blocking subprocess, state that live progress is unavailable and report the final captured output once it returns.
+- If the host cannot surface live output or the Expert runs as a blocking subprocess, state before the wait that the current Expert invocation is `blocking capture`, explain why streaming/log polling was unavailable or unsafe, and report the final captured output once it returns.
 - Always capture the final expert output for integration review, even if intermediate streaming was unavailable.
 
 ## Prompt Templates
