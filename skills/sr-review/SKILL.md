@@ -282,8 +282,10 @@ For host code-review output, the top severity finding can satisfy this rule with
 If no serious defect is found, do not invent one. For artifact-review output, use:
 
 ```markdown
-最严重的一个缺陷：未发现明确严重缺陷；最高价值改进是...
+未发现阻断性缺陷；最高价值改进是...
 ```
+
+In Chinese output, avoid the awkward shape `最严重的一个缺陷：未发现...缺陷`. It reads like "the worst defect is that no defect was found." Keep the no-finding statement in the findings-first position, but phrase it as `未发现阻断性缺陷` or `未发现新的实质问题；剩余的是...` depending on the review target.
 
 For host code-review output with no findings, say that clearly and mention the highest residual test gap or risk.
 Then list the strongest remaining improvement or risk. If even that is minor, say so plainly.
@@ -347,7 +349,7 @@ For artifact-review output, start the findings section with:
 ```
 
 For host code-review output, use the Ordinary Code Review Adapter instead of forcing this exact phrase.
-If no serious defect exists, use the no-fabrication fallback from the Anti-Sycophancy Rule.
+If no serious defect exists, use the no-fabrication fallback from the Anti-Sycophancy Rule, such as `未发现阻断性缺陷；最高价值改进是...` or `未发现新的实质问题；剩余的是...`.
 
 Then identify the highest-value issues:
 

@@ -197,7 +197,8 @@ Host review
 -> Expert cold workspace review
 -> Host repair of accepted Expert findings
 -> validation
--> repeat Expert cold workspace review until clean or blocked
+-> Host re-review repair diff
+-> repeat Expert cold workspace review until Host and Expert gates are clean or blocked
 ```
 
 Use `sr-expert`'s Cold Workspace Review lane by default. The Expert should be read-only and should start from `git status`, `git diff`, and the changed-file list instead of from the Host Agent's implementation summary.

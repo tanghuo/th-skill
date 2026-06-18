@@ -18,8 +18,11 @@ read task
 -> validate
 -> spec review
 -> code review
+-> repair Host findings and validate
 -> expert strict gate when requested or passed by runner
--> repair
+-> repair accepted Expert findings and validate
+-> Host re-review repair diff
+-> Expert re-review until clean or blocked
 -> repeat until no material task-local issues remain
 -> update task status and completion log
 ```
