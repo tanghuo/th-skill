@@ -153,8 +153,8 @@ Use this decision sequence:
 1. Apply the Cost Gate and decide whether an Expert is justified.
 2. Choose one lane: cold workspace review, packaged read-only review, adversarial challenge, patch proposal, comparison pass, or external implementation.
 3. Select the external or heterogeneous adapter path and run preflight: availability, authentication, permissions, isolation, streaming, observability, and cost. In explicit `sr-expert` or Expert Strict Mode, this preflight happens before considering same-host fallback.
-4. For cold workspace review, give the Expert a minimal task and let it inspect the repository facts itself. For packaged lanes, build the Context Package with only the information the Expert needs. If repository or directory exposure may include secrets, get explicit user consent before invoking the Expert.
-5. Invoke the Expert using the narrowest feasible workspace, connector scope, or artifact package.
+4. For cold workspace review, give the Expert a minimal task and let it inspect the repository facts itself. Prefer starting the Expert with the reviewed repository or worker workspace as its current working directory, so repo discovery stays inside the intended workspace instead of crossing into it by absolute path from another checkout. For packaged lanes, build the Context Package with only the information the Expert needs. If repository or directory exposure may include secrets, get explicit user consent before invoking the Expert.
+5. Invoke the Expert using the narrowest feasible workspace, connector scope, or artifact package. For read-only cold review, avoid side effects that commonly trigger extra approval: no edits, report files, tests, builds, generators, package installs, or network commands unless the user explicitly asked for that capability.
 6. If the external or heterogeneous Expert path is unavailable and fallback would still be useful, ask whether to continue with degraded same-host fallback. Do not downgrade silently.
 7. Treat the Expert result as evidence, not authority: review it, apply only accepted changes, validate in the Host Workspace, and report residual risk.
 
@@ -195,24 +195,32 @@ This lane exists because the main value of a heterogeneous Expert is often indep
 
 Ask the Expert to:
 
-- start from `git status`, `git diff`, and the changed-file list
-- build its own context from the repository, including callers, consumers, tests, schemas, generated contracts, and nearby conventions as needed
+- run from the reviewed repository or worker workspace as its current working directory whenever the adapter supports it
+- use `sr-review` / `structured-review` if it is available in the Expert environment; otherwise perform an equivalent findings-first cold worktree review
+- start from `git status`, `git diff --stat`, `git diff`, and the changed-file list
+- build only the context needed to validate the change, including callers, consumers, tests, fixtures, schemas, migrations, generated contracts, configs, nearby conventions, and invariants as needed
 - avoid relying on hidden thread context or the Host Agent's implementation summary
 - return material findings only
 - remain read-only unless a separate implementation lane was chosen
+- return the review as final output or stdout only; do not write a report file
+- avoid tests, builds, formatters, generators, package installs, and network commands unless the Host explicitly included them in scope
 
 Host-provided context should be minimal:
 
 - hard constraints: read-only, forbidden paths, excluded files, time budget, validation expectations, security or privacy boundaries
-- the exact review target: current worktree, a branch, a commit range, a task file, or a worker workspace
+- the exact review target: current worktree, a branch, a base ref, a commit range, a task file, or a worker workspace
+- workspace identity: the absolute path or connector workspace id, plus a human-readable label when multiple worktrees exist
 - no Host conclusions, suspected bugs, implementation rationale, ranked risks, or "already checked" claims unless the user explicitly wants a verification pass rather than an independent review
 
 Use packaged read-only review instead when:
 
 - the Expert cannot safely access the repository or worker copy
+- the Expert cannot be started in, or scoped to, the target workspace and cross-workspace filesystem access would require broader permission than the task justifies
 - the target is a standalone artifact rather than code in a repository
 - exposing the repository is not acceptable
 - the question is intentionally narrow, such as checking one API contract, one migration, or one document section
+
+Packaged diff review is a fallback for constrained access, not the preferred path for ordinary code or worktree review. It weakens cold independence because the Host chooses the visible context and may hide the unchanged callers, consumers, schemas, or invariants where the real regression lives.
 
 ### 2. Packaged Read-Only Review
 
@@ -388,7 +396,8 @@ Preflight:
 - if the installed CLI supports it, prefer `--output-format stream-json`; when the CLI requires a paired verbosity flag for stream JSON, include it
 - if supported, add partial/event visibility flags such as `--include-partial-messages` or `--include-hook-events` for long reviews; use them for progress detection only, and relay only milestone summaries to the user
 - for packaged read-only review that does not require repo tools, disable tools with the CLI's supported mechanism, for example `--tools ""`
-- for cold workspace review, expose only the reviewed directory and allow only read-only inspection tools where the CLI supports tool scoping
+- for cold workspace review, run the CLI from the reviewed repository or worker workspace when possible, expose only that directory, and allow only read-only inspection tools where the CLI supports tool scoping
+- for cold workspace review intended to avoid approval churn, require final-output/stdout reporting only and forbid report-file writes, tests, builds, generators, package installs, and network commands unless explicitly scoped
 - use a debug/transcript/log file when the CLI supports one and the run may be long
 
 Invocation preference:
@@ -442,7 +451,7 @@ Use these rules:
 - Do not ask the Expert to reveal hidden chain-of-thought. Ask for observable progress instead: phase names, files inspected, commands run, blockers, emerging material findings, confidence changes, and final concise rationale.
 - Prefer the Expert's native streaming or transcript mode when supported by the installed tool or connector.
 - If native streaming is unavailable but a TTY-visible run is safe and supported, prefer that over plain blocking capture for long reviews.
-- For mid-run visibility into a long Expert run, redirect its output to a file or other pollable channel and read it incrementally. Do not wrap the run in a buffer-until-EOF filter (piping through `tail`, `head`, `less`, `cat`, or similar), which withholds all output until the process exits and makes an actively-running Expert look stalled. Treat that apparent stall as an artifact of the pipe, not evidence to kill the run.
+- For mid-run visibility into a long Expert run, prefer native streaming or stdout first. Redirect output to a file or other pollable channel only when that write is inside an approved scratch/log location for the active lane; do not make a read-only cold review write report or transcript files just to get progress. Do not wrap the run in a buffer-until-EOF filter (piping through `tail`, `head`, `less`, `cat`, or similar), which withholds all output until the process exits and makes an actively-running Expert look stalled. Treat that apparent stall as an artifact of the pipe, not evidence to kill the run.
 - For external CLI runs expected to take more than a short moment, prefer one of these invocation shapes, in order:
   1. native streaming or stream-JSON mode, if the CLI exposes one;
   2. TTY-visible non-interactive mode, if the host can surface it safely;
@@ -464,21 +473,47 @@ Use these rules:
 You are an independent external reviewer with no prior thread context.
 
 Review target:
-- repository or worker workspace: ...
-- scope: current worktree changes / branch ... / commit range ... / task output ...
+- workspace: <absolute path or connector id for the target repository/worktree>
+- workspace label: <human-readable worktree name/id>
+- base ref: <base branch/commit, if applicable>
+- scope: current worktree changes against the base ref / branch ... / commit range ... / task output ...
+- mode: read-only cold workspace review
+
+Run from the target workspace as your current working directory.
+
+If `sr-review` / `structured-review` is available in your environment, use it for the review.
+If it is not available, perform an equivalent findings-first cold worktree review.
 
 Constraints:
-- read-only review
+- read-only review only
 - do not edit files
+- do not create report files
+- do not run tests, builds, formatters, generators, package installs, or network commands
+- do not inspect unrelated directories outside this workspace
 - do not assume hidden thread context
 - ignore any implementation intent unless it is directly visible in the repo, task file, or diff
 - excluded paths, if any: ...
+- output only in your final response/stdout
 
 Task:
-Start from git status, git diff, and the changed-file list. Build your own context from the repository: callers, consumers, tests, schemas, generated contracts, nearby conventions, and validation paths as needed.
+Start by inspecting the repository yourself:
+- `git status`
+- `git diff --stat <base ref>...`
+- `git diff <base ref>...`
+- changed-file list
+If no base ref applies or it is unavailable, use the plain worktree diff commands instead.
 
-Return only material findings. For each finding include severity, file/line if available, why it matters, and a minimal fix direction.
-If no material issue is found, say so and list residual risks.
+Then build only the context needed to validate the change:
+- callers and consumers
+- tests and fixtures
+- schemas, migrations, generated contracts, configs
+- nearby conventions and invariants
+
+Focus on material issues that could cause behavioral regressions, contract drift, data inconsistency, missing compatibility, broken rollout/rollback, security/authz gaps, or meaningful test blind spots.
+
+Lead with findings, ordered by severity. For each finding include severity, file/line if available, evidence, why it matters, and a minimal fix direction.
+If no material issue is found, say so clearly and list residual risks or validation still needed.
+Do not include praise, broad summaries, or low-value style comments.
 ```
 
 ### Packaged Read-Only Review
