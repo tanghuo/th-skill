@@ -1,6 +1,6 @@
 # 技术债：Dead Code & 重复逻辑 & 低价值抽象
 
-> 合并原 debt 三件套。修复阶段可配合 go-abstraction-pruning / go-test-seam-discipline 等本机 skill。
+> 合并原 debt 三件套。修复阶段可配合 go-abstraction-discipline / go-test-seam-discipline 等本机 skill。
 
 ```text
 审计真实无用的代码、实质重复的业务逻辑和低价值抽象。

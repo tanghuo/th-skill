@@ -2,7 +2,7 @@
 
 > 针对一次变更/diff/PR，评估它相对"最小充分解"是否做多了。独立模式，不拼接 `_base.md`。
 > 本模式只产出 Review 结论，不改代码；用户明确要求"按结论修复/删减"时才进入修复阶段
-> （可配合 go-abstraction-pruning / go-fail-fast-wiring / go-test-seam-discipline 等本机 skill）。
+> （可配合 go-abstraction-discipline / go-fail-fast-wiring / go-test-seam-discipline 等本机 skill）。
 
 ```text
 你现在执行"过度实现 Review"。本模式只评估本次 diff/PR 相对最小充分解是否写多了,

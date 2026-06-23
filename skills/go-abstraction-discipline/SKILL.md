@@ -1,6 +1,6 @@
 ---
 name: go-abstraction-discipline
-description: Use when refactoring Go code to remove low-value abstractions, keep business checks at the business layer, place abstractions on the layer that owns the semantics, and extract helpers only when they carry real reusable meaning.
+description: Use when refactoring Go code to remove low-value abstractions (thin wrappers, single-use helpers/constants, forwarding layers, leftover migration scaffolding), keep public method sets small with contract-strengthening siblings that earn their place, keep business checks at the business layer, and place abstractions on the layer that owns the semantics.
 ---
 
 # Go Abstraction Discipline
@@ -27,6 +27,8 @@ Use this skill when you see any of these:
 - unrelated side effects interrupt a local value-construction flow
 - a helper or method returns implementation-process state that callers do not actually need
 - a struct exists only to bundle values that callers immediately unpack
+- the public API has grown `GetX`/`RequireX` (or exported `X` plus private `x`) pairs where one only forwards to the other
+- a transition layer or historical name survived after the migration it served finished
 
 ## Core principles
 
@@ -98,6 +100,9 @@ These are often negative-value abstractions:
 - a read helper that quietly becomes a validator, repairer, or hard requirement even though its contract only says "get" or "lookup"
 - a returned `claimed`, `created`, `loaded`, or similar flag that callers do not use for meaningful branching
 - a broad `Result` or `Route` struct introduced only to carry a few values that callers immediately unpack
+- an exported `GetX` that only forwards to `loadX`, or an exported `X` paired with a private `x` where one only forwards
+- a sibling API or wrapper added only for naming symmetry, with no caller-visible contract difference
+- a leftover migration or transition layer, or a type/file name frozen from an old responsibility
 
 ## Decision rule
 
@@ -310,6 +315,35 @@ type MutationRoute struct {
 
 when every caller immediately does `route.Owner` and `route.Local`.
 
+### 15. Keep the public API smaller than the implementation surface
+
+Preferred:
+
+```go
+func (s *Service) MustGetRoomSnapshot(ctx context.Context, roomID int64) (*RoomSnapshot, error) {
+    snapshot, err := s.loadRoomSnapshot(ctx, roomID)
+    if err != nil {
+        return nil, err
+    }
+    if snapshot == nil {
+        return nil, xerr.New(xerr.CodeNotFound, "room not found")
+    }
+    return snapshot, nil
+}
+```
+
+A `MustX` sibling earns its place only when it strengthens the contract, such as turning absence into `not found`.
+Do not add a `GetX` that only forwards to `loadX` with identical semantics just so the pair looks symmetrical.
+Do not keep both an exported `X` and a private `x` when one only forwards to the other; put the implementation on the single form callers actually use.
+Prefer the smallest reversible API: add a weaker sibling later if a real caller appears.
+Use one verb for one idea; do not mix `Must*` and `Require*` for the same strengthening.
+
+### 16. Remove leftover migration scaffolding and stale names
+
+Transition layers added during a refactor should be deleted once the real architecture is in place.
+Do not let exported wrappers, helper layers, or type and file names freeze a historical shape after the responsibility moved.
+If a name reflects an old implementation instead of the current job, rename it.
+
 ## Common smells
 
 - single-use helpers with names broader than their real value
@@ -322,6 +356,8 @@ when every caller immediately does `route.Owner` and `route.Local`.
 - tolerant parsers leaking into strict internal code
 - methods silently enforcing stronger semantics than their names imply
 - returns that describe callee internals instead of caller needs
+- public API pairs (`GetX`/`RequireX`, exported `X`/private `x`) where one only forwards to the other
+- migration scaffolding or historical names left in place after the responsibility changed
 
 ## Refactoring pattern
 

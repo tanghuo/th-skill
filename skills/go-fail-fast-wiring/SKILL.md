@@ -123,6 +123,7 @@ If any of these are false, do not remove the guard mechanically.
 - Do not keep meaningless runtime nil guards just to accommodate lazy test setup.
 - Prefer constructors, builders, or explicit test wiring helpers.
 - If tests need mocks, solve that in test setup rather than polluting production happy paths.
+- For seams and nil guards that exist only because tests construct half-built objects, see go-test-seam-discipline; this skill focuses on startup-time validation of required dependencies.
 
 ## Expected outcomes
 

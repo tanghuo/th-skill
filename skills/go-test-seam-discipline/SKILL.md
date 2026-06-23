@@ -1,6 +1,6 @@
 ---
 name: go-test-seam-discipline
-description: Use when refactoring Go code so tests do not dictate production structure, especially when function fields, local interfaces, nil guards, or injected seams exist only to support tests rather than real runtime boundaries.
+description: Use when refactoring Go code so tests do not dictate production structure, especially when function fields, local interfaces, nil guards, injected seams, convenience constructors, or fallback implementations exist only to support tests rather than real runtime boundaries.
 ---
 
 # Go Test Seam Discipline
