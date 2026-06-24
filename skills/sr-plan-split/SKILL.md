@@ -237,6 +237,8 @@ Explicit exclusions. Include P2 or future work here.
 
 Only the plan facts and repo facts needed to execute this task without rereading the full plan.
 
+Orientation anchors: the key existing files to read first, as `path` plus the relevant symbol (function/type/section) — no line numbers, they go stale. List read-first anchors even when this task will not modify them; this is distinct from `Scope`, which lists what the task owns or writes.
+
 ## Implementation Notes
 
 Specific constraints, invariants, edge cases, and local patterns to preserve.

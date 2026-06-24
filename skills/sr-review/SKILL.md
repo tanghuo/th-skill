@@ -34,6 +34,7 @@ Allowed inputs:
 - artifact text supplied in the conversation
 - a Skill file, prompt, plan, spec, decision memo, or other local artifact explicitly named by the user
 - a commit, diff, PR, patch, or generated artifact explicitly named by the user
+- the current git worktree status and staged/unstaged diff when the user makes a bare explicit invocation from a repository context
 - supporting material the user explicitly asks to verify
 
 Input gathering means reading the supplied artifact or user-named target. It also includes read-only local commands needed to inspect that target or produce exact references, such as `rg`, `sed`, `nl`, `ls`, `wc`, `git show`, `git diff`, or `git status`.
@@ -80,6 +81,13 @@ Use this skill unconditionally only when the user explicitly names the Skill or 
 - `用 structured-review 技能`
 
 Do not treat bare generic wording such as `structured review`, `结构化审查`, or `结构化评审` as an unconditional trigger by itself. Route those through Serious Artifact Review Invocation or Artifact Review Context, where the target must still be concrete and non-trivial.
+
+Bare explicit invocation has a default target. When the user only invokes this Skill (for example `sr-review`, `$sr-review`, or a Skill mention) and does not name an artifact, path, commit, PR, or diff:
+
+- If the current working directory is a git worktree, default to reviewing the current main worktree state: `git status` plus staged and unstaged diffs.
+- Treat that target as an ordinary code/worktree review and use the Ordinary Code Review Adapter.
+- If there is no staged or unstaged diff, say that there is no reviewable worktree diff instead of inventing a target.
+- If the current context is not a git worktree and no artifact is visible, ask the user for the review target.
 
 If the target is an ordinary code diff, commit, or PR, use the Ordinary Code Review Adapter instead of artifact-review templates.
 
@@ -134,7 +142,7 @@ For normal code review, use the default findings-first review workflow unless th
 
 When instructions pull in different directions, apply this order:
 
-1. Explicit Skill naming wins. The authoritative list of explicit-naming forms lives in `Trigger Rules § A`; any form listed there (including the space variant `结构化 review`) bypasses the non-trivial-artifact gate. Forms not listed there do not.
+1. Explicit Skill naming wins. The authoritative list of explicit-naming forms lives in `Trigger Rules § A`; any form listed there (including the space variant `结构化 review`) bypasses the non-trivial-artifact gate. Forms not listed there do not. A bare explicit invocation in a git worktree defaults to the current worktree review target defined in § A.
 2. Serious scrutiny phrases such as `红队`, `多角度`, `新上下文`, `深度review`, `完整审查`, or `穷尽审查` require a concrete, non-trivial artifact or review/revision target.
 3. Routine-task exclusions block implicit triggering. Ordinary code review, small edits, simple questions, and direct implementation requests do not trigger this skill unless the user explicitly named it.
 4. For ordinary code review with an explicit `structured-review` request, keep the host's findings-first review format and use this skill only to increase scrutiny. Do not force phase headings, phase tables, or artifact-review templates.

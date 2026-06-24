@@ -121,7 +121,7 @@ Freeze:
 - declared scope and out-of-scope items
 - dependencies
 - current git status
-- relevant existing code paths
+- relevant existing code paths, read from the task's `Context` orientation anchors before grepping for them yourself
 
 If dependencies are not completed:
 

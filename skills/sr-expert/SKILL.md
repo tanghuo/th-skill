@@ -361,7 +361,8 @@ Preflight:
 5. If the Expert requires network, authentication, browser state, OAuth, API keys, keychain access, or local app state, treat that as an external capability and use the host's approval flow.
 6. Keep invocation scoped to the concrete Expert command or connector action. Use the Reviewer-Compliant Approval Requests template above: name the user-authorized scope, the destination Expert/provider, the lane-specific data boundary, the read-only or write lane, and the fallback if denied. Do not request broad permanent permission unless the user explicitly wants that tradeoff.
 7. Choose the best available observability mode before invocation: native streaming, PTY-visible run, background run with pollable transcript/log, or blocking capture. For external CLI review lanes, prefer a stream/event mode that the Host can poll incrementally; do not start a long Expert run without knowing which mode is in use.
-8. If the Expert is unavailable or approval is denied, mark the lane unavailable and continue with the primary `sr-*` workflow.
+8. Do not override the external Expert's default model by default. Use the CLI/connector's configured default model unless the user explicitly requested a specific model, the active workflow requires a named capability tier, or the Host has just verified an exact model id/alias and can justify the override. Never guess a model alias for cost or speed and still treat the run as the normal Expert gate.
+9. If the Expert is unavailable or approval is denied, mark the lane unavailable and continue with the primary `sr-*` workflow.
 
 Explicit `sr-expert` and Expert Strict Mode add one stricter rule: after an external or heterogeneous Expert path is marked unavailable, stop and ask whether to continue with degraded same-host fallback. Do not continue as if same-host review satisfied the Expert gate.
 
@@ -393,6 +394,7 @@ Preflight:
 - run `command -v claude` and inspect `claude --help`
 - when asking for approval, use the Reviewer-Compliant Approval Requests template: state that the user explicitly invoked `sr-expert` and authorized scoped read-only review, identify Claude/Anthropic as the destination, identify whether this is cold workspace review or packaged review, include the repository/workspace path or artifact boundary, list the lane-specific permitted data boundary, list forbidden surfaces such as secrets, unrelated directories, browser state, and production data, and name the fallback if approval is denied
 - prefer `claude -p` non-interactive mode for review lanes
+- do not pass `--model` by default; use Claude CLI's configured default model. Pass `--model` only when the user explicitly requested one, or when a specific id/alias has been freshly verified and the reason for overriding the default is stated.
 - if the installed CLI supports it, prefer `--output-format stream-json`; when the CLI requires a paired verbosity flag for stream JSON, include it
 - if supported, add partial/event visibility flags such as `--include-partial-messages` or `--include-hook-events` for long reviews; use them for progress detection only, and relay only milestone summaries to the user
 - for packaged read-only review that does not require repo tools, disable tools with the CLI's supported mechanism, for example `--tools ""`
@@ -426,6 +428,7 @@ Preflight:
 
 - prefer a Codex app, connector, thread, or worktree tool when the host exposes one, because it provides the clearest completion signal and workspace isolation
 - otherwise inspect `codex --help` or the installed Codex CLI/connector docs for non-interactive mode, streaming or JSON output, transcript/log support, worktree support, and tool scoping
+- do not override the Codex connector or CLI default model by default. Specify a model only when the user explicitly requested one, or when a specific id/alias has been freshly verified and the reason for overriding the default is stated.
 - verify whether the Codex path shares the Host filesystem; if it does not, require a textual review report, unified diff, or Integration Diff instead of assuming local files changed
 
 Invocation preference:
