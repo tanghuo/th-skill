@@ -77,6 +77,23 @@ Start with read-only commands:
 
 Keep the review tied to the target. Read surrounding code only when needed to avoid false findings or to understand runtime behavior.
 
+## Repo-Local Hard Gate
+
+If the target repository contains an executable `.local/srctl.sh`, use it as the hard gate for this loop.
+
+This script is for mechanical enforcement only. It does not replace review judgment, materiality decisions, repair design, or validation selection.
+
+Required use:
+
+- After target resolution and before review, repair, or subagent delegation, run `.local/srctl.sh freeze <short-label>`.
+- Treat the srctl run as the frozen target record, while still recording material findings in the chat or task notes as usual.
+- After a repair batch and before relying on validation, run `.local/srctl.sh validate -- <chosen validation command>`.
+- If multiple validation commands are needed, run the supporting commands normally and finish with one srctl validation command that represents the current gate, or use a wrapper command that runs the required set.
+- Before any commit that belongs to this loop, after staging the intended coherent change set, run `.local/srctl.sh precommit`.
+- If srctl reports drift, failed validation, missing staged diff, or another blocker, do not bypass it. Refresh the freeze or validation only after explaining why the target legitimately changed.
+
+If `.local/srctl.sh` is absent, continue with the normal skill workflow. Do not create or modify repo-local srctl tooling unless the user asks for that tooling work.
+
 ## Continuation Guardrails
 
 When this workflow resumes from `/goal`, an interruption, compaction, duplicated environment context, or a side conversation handoff, do not restart the loop blindly. First reconcile the current execution state:

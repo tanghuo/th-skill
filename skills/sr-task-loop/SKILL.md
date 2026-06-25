@@ -134,6 +134,23 @@ If the worktree is dirty:
 - never revert unrelated user changes
 - work with related changes when possible
 
+### 1.5 Repo-Local Hard Gate
+
+If the target repository contains an executable `.local/srctl.sh`, use it as the hard gate for the task loop.
+
+This script is for mechanical enforcement only. It does not replace task interpretation, implementation judgment, spec review, code review, or validation selection.
+
+Required use:
+
+- After reading the task and freezing scope, before editing implementation files or delegating worker/subagent work, run `.local/srctl.sh freeze <task-id-or-short-label>`.
+- Treat the srctl run as the mechanical snapshot of the task's starting target. The task file remains the task source of truth.
+- Run `.local/srctl.sh validate -- <chosen validation command>` for the validation result that should gate task completion.
+- If multiple validation commands are needed, run supporting commands normally and finish with one srctl validation command that represents the current gate, or use a wrapper command that runs the required set.
+- If the task loop also performs a commit, stage only the intended coherent task change set and run `.local/srctl.sh precommit` before committing.
+- If srctl reports drift, failed validation, missing staged diff, or another blocker, do not bypass it. Refresh the freeze or validation only after explaining why the task target legitimately changed.
+
+If `.local/srctl.sh` is absent, continue with the normal skill workflow. Do not create or modify repo-local srctl tooling unless the user asks for that tooling work.
+
 ### 2. Clarify Only Real Blockers
 
 Ask the user only when:
