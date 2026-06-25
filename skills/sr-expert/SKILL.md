@@ -402,6 +402,8 @@ Preflight:
 - run `command -v claude` and inspect `claude --help`
 - when asking for approval, use the Reviewer-Compliant Approval Requests template: state that the user explicitly invoked `sr-expert` and authorized scoped read-only review, identify Claude/Anthropic as the destination, identify whether this is cold workspace review or packaged review, include the repository/workspace path or artifact boundary, list the lane-specific permitted data boundary, list forbidden surfaces such as secrets, unrelated directories, browser state, and production data, and name the fallback if approval is denied
 - prefer `claude -p` non-interactive mode for review lanes
+- put the prompt immediately after `-p` / `--print`, before variadic options such as `--tools`, `--allowedTools`, or `--disallowedTools`. If the prompt is placed after those options, the CLI may parse it as another option value and exit with "Input must be provided either through stdin or as a prompt argument when using --print"
+- do not rely on delayed stdin for `claude -p` in host exec sessions unless a preflight confirms that the process keeps stdin open; many host runners close stdin at spawn time, causing print mode to exit before a later write can arrive
 - do not pass `--model` by default; use Claude CLI's configured default model. Pass `--model` only when the user explicitly requested one, or when a specific id/alias has been freshly verified and the reason for overriding the default is stated.
 - if the installed CLI supports it, prefer `--output-format stream-json`; when the CLI requires a paired verbosity flag for stream JSON, include it
 - if supported, add partial/event visibility flags such as `--include-partial-messages` or `--include-hook-events` for long reviews; use them for progress detection only, and relay only milestone summaries to the user
@@ -414,10 +416,10 @@ Preflight:
 
 Invocation preference:
 
-1. `claude -p --verbose --output-format stream-json ...` with partial messages/events when available, captured to a pollable log or surfaced by the Host tool. Include `--verbose` only when the installed CLI requires or supports it. This is the default for non-trivial Claude review lanes, including packaged review and cold workspace review.
-2. `claude -p ...` in TTY-visible mode when the Host can surface it safely.
-3. `claude -p --output-format json ...` only when paired with a pollable debug/transcript/log file that provides the live progress channel.
-4. Blocking `claude -p ...` only when the above are unavailable or unsafe, and only after stating that this run is `blocking capture`.
+1. `claude -p "<prompt>" --verbose --output-format stream-json ...` with partial messages/events when available, captured to a pollable log or surfaced by the Host tool. Include `--verbose` only when the installed CLI requires or supports it. This is the default for non-trivial Claude review lanes, including packaged review and cold workspace review.
+2. `claude -p "<prompt>" ...` in TTY-visible mode when the Host can surface it safely.
+3. `claude -p "<prompt>" --output-format json ...` only when paired with a pollable debug/transcript/log file that provides the live progress channel.
+4. Blocking `claude -p "<prompt>" ...` only when the above are unavailable or unsafe, and only after stating that this run is `blocking capture`.
 
 Progress handling:
 
