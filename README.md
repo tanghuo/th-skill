@@ -17,6 +17,7 @@ examples/
 scripts/
   install-codex.sh
   install-claude.sh
+  install-sr-gate.sh
 ```
 
 - `skills/`: installable global skills.
@@ -41,6 +42,16 @@ scripts/install-claude.sh
 The install scripts copy `skills/*` into the target local skill directory. They
 do not copy sessions, caches, history, auth state, or other local app data.
 
+Install the repo-local SR commit hygiene gate into a target repository:
+
+```bash
+scripts/install-sr-gate.sh /path/to/repo
+```
+
+This copies `templates/sr-gate/srctl.sh` to `.local/srctl.sh` in the target repo
+and installs a git `pre-commit` hook that verifies frozen target membership,
+staged-diff hash-bound checks, and cheap commit hygiene checks.
+
 ## Audit Assets
 
 - `skills/audit/`: global entry wrapper. It expects a repo-local
@@ -49,6 +60,8 @@ do not copy sessions, caches, history, auth state, or other local app data.
   Copy it into a repository's `.local/review/` and replace placeholders with
   real entry points, state objects, schema paths, runtime constraints, and run
   history.
+- `templates/sr-gate/`: repo-local commit hygiene gate used by `sr-task-loop`
+  and `sr-worktree-review-fix-loop` when installed.
 - `examples/`: optional local snapshots of repo-specific audit prompt libraries.
   This directory is gitignored because those snapshots may contain private
   architecture notes, entry maps, business semantics, and run history.
