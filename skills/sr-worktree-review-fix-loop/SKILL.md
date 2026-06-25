@@ -79,18 +79,18 @@ Keep the review tied to the target. Read surrounding code only when needed to av
 
 ## Repo-Local Hard Gate
 
-If the target repository contains an executable `.local/srctl.sh`, use it as the hard gate for this loop.
+If the target repository contains an executable `.local/srctl.sh`, use it as the repo-local commit hygiene gate for this loop.
 
-This script is for mechanical enforcement only. It does not replace review judgment, materiality decisions, repair design, or validation selection.
+This script is for product-level commit checks only: frozen target membership, staged-diff drift, whitespace checks, and validation bound to the staged diff hash. It does not prove that review happened and does not replace review judgment, materiality decisions, repair design, or validation selection.
 
 Required use:
 
 - After target resolution and before review, repair, or subagent delegation, run `.local/srctl.sh freeze <short-label>`.
-- Treat the srctl run as the frozen target record, while still recording material findings in the chat or task notes as usual.
-- After a repair batch and before relying on validation, run `.local/srctl.sh validate -- <chosen validation command>`.
-- If multiple validation commands are needed, run the supporting commands normally and finish with one srctl validation command that represents the current gate, or use a wrapper command that runs the required set.
-- Before any commit that belongs to this loop, after staging the intended coherent change set, run `.local/srctl.sh precommit`.
-- If srctl reports drift, failed validation, missing staged diff, or another blocker, do not bypass it. Refresh the freeze or validation only after explaining why the target legitimately changed.
+- If a freeze already exists, inspect `.local/srctl.sh status`; refresh only when the target legitimately changed, using `.local/srctl.sh freeze --refresh --reason <reason> <short-label>`.
+- Stage only the intended coherent change set, then run `.local/srctl.sh check -- <chosen validation command>` so the passing check is bound to the current staged diff hash.
+- If multiple validation commands are needed, run supporting commands normally and finish with one srctl check command that runs the required gating set.
+- Before any commit that belongs to this loop, ensure `.git/hooks/pre-commit` is installed by `.local/srctl.sh install-hook`; commit normally and let the git hook run `.local/srctl.sh verify`.
+- If srctl reports staged files outside the freeze, failed validation, missing check-pass, staged hash drift, or another blocker, do not bypass it with `--no-verify`. Refresh the freeze or rerun check only after explaining why the target or staged content legitimately changed.
 
 If `.local/srctl.sh` is absent, continue with the normal skill workflow. Do not create or modify repo-local srctl tooling unless the user asks for that tooling work.
 
