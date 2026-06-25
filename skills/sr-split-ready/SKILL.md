@@ -65,6 +65,14 @@ Do not use this skill for:
 
 Long term, high-risk `sr-review` outputs should ideally include split-ready fields. This skill mainly adapts external reports, legacy drafts, and review artifacts that were not produced in that shape.
 
+If the target repository contains an executable `.local/sr-run.sh` and this is part of a broader `feature-dev` workflow, use it as the phase driver:
+
+- Run `.local/sr-run.sh status` and `.local/sr-run.sh next` before continuing.
+- When the artifact is ready to split, run `.local/sr-run.sh advance split --note <short-note>`.
+- If the artifact is not ready or requires user input, run `.local/sr-run.sh block <reason>` only when the workflow cannot continue.
+
+The driver records workflow position only. It does not replace this skill's verdict or checklist.
+
 ## Output Contract
 
 Always start with a verdict:

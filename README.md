@@ -18,6 +18,7 @@ scripts/
   install-codex.sh
   install-claude.sh
   install-sr-gate.sh
+  install-sr-driver.sh
 ```
 
 - `skills/`: installable global skills.
@@ -52,6 +53,16 @@ This copies `templates/sr-gate/srctl.sh` to `.local/srctl.sh` in the target repo
 and installs a git `pre-commit` hook that verifies frozen target membership,
 staged-diff hash-bound checks, and cheap commit hygiene checks.
 
+Install the repo-local SR workflow state driver into a target repository:
+
+```bash
+scripts/install-sr-driver.sh /path/to/repo
+```
+
+This copies `templates/sr-driver/sr-run.sh` to `.local/sr-run.sh` in the target
+repo. The driver records the active `sr-*` workflow phase and prints the next
+skill/action for the agent.
+
 ## Audit Assets
 
 - `skills/audit/`: global entry wrapper. It expects a repo-local
@@ -62,6 +73,8 @@ staged-diff hash-bound checks, and cheap commit hygiene checks.
   history.
 - `templates/sr-gate/`: repo-local commit hygiene gate used by `sr-task-loop`
   and `sr-worktree-review-fix-loop` when installed.
+- `templates/sr-driver/`: repo-local state driver for `worktree-review`,
+  `task-loop`, `task-runner`, and `feature-dev` workflows.
 - `examples/`: optional local snapshots of repo-specific audit prompt libraries.
   This directory is gitignored because those snapshots may contain private
   architecture notes, entry maps, business semantics, and run history.

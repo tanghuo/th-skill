@@ -81,6 +81,14 @@ Default output directory:
 
 ## Workflow
 
+If the target repository contains an executable `.local/sr-run.sh` and this split is part of a broader `feature-dev` workflow, use it as the phase driver:
+
+- Run `.local/sr-run.sh status` and `.local/sr-run.sh next` before continuing.
+- After task files are created and the split is ready for execution, run `.local/sr-run.sh advance task-runner --note <short-note>`.
+- If blockers prevent a safe split, run `.local/sr-run.sh block <reason>`.
+
+The driver records workflow position only. It does not replace plan review, task decomposition, coverage reconciliation, or task-file quality checks.
+
 ### 1. Freeze the Plan
 
 Read the plan artifact and record:

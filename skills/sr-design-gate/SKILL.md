@@ -70,6 +70,14 @@ If the user explicitly says to implement immediately and the change is small, do
 
 ## Workflow
 
+If the target repository contains an executable `.local/sr-run.sh` and the user is running a broader `feature-dev` workflow, use it as the phase driver:
+
+- If no active driver workflow exists and the user asked for feature development from rough intent, run `.local/sr-run.sh start feature-dev <target-or-design-artifact> --label <short-label>`.
+- If a driver workflow already exists, run `.local/sr-run.sh status` and `.local/sr-run.sh next` before continuing, and follow the reported phase unless it conflicts with newer user instructions.
+- After design drafting, design review, split readiness, plan split, block, or completion, record the transition with `.local/sr-run.sh advance <phase> --note <short-note>`, `.local/sr-run.sh block <reason>`, or `.local/sr-run.sh done --note <short-note>`.
+
+The driver records workflow position only. It does not replace design judgment, repo truth gathering, user confirmation, `sr-review`, `sr-split-ready`, `sr-plan-split`, or downstream execution.
+
 ### 1. Scope Triage
 
 Decide whether this is:

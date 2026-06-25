@@ -156,6 +156,30 @@ active owner workflow
 
 Use this when heterogeneity or cold-context independence is worth the overhead.
 
+## Repo-Local Workflow Driver
+
+Some repositories may install `.local/sr-run.sh`, a repo-local state driver for `sr-*` workflows.
+
+When it exists, use it to record and recover workflow phase, not to replace the owner skills:
+
+- `worktree-review`: current dirty diff review/fix loop, owned by `sr-worktree-review-fix-loop`.
+- `task-loop`: one task markdown file, owned by `sr-task-loop`.
+- `task-runner`: task directory or task batch, owned by `sr-task-runner`.
+- `feature-dev`: rough intent to design, review, split, and then task-runner.
+
+Default driver commands:
+
+```text
+.local/sr-run.sh start <workflow> [target] [--label <text>]
+.local/sr-run.sh status
+.local/sr-run.sh next
+.local/sr-run.sh advance <phase> [--note <text>]
+.local/sr-run.sh block <reason>
+.local/sr-run.sh done [--note <text>]
+```
+
+The driver constrains phase and next action. It does not prove review quality, choose business behavior, or replace `sr-review`, `sr-task-loop`, `sr-task-runner`, `sr-design-gate`, or `sr-expert`.
+
 ## Important Distinctions
 
 ### `sr-task-loop` vs `sr-task-runner`

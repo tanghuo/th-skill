@@ -96,6 +96,20 @@ Required use:
 
 If `.local/srctl.sh` is absent, continue with the normal skill workflow. Do not create or modify repo-local srctl tooling unless the user asks for that tooling work.
 
+## Repo-Local Workflow Driver
+
+If the target repository contains an executable `.local/sr-run.sh`, use it as the phase driver for this loop.
+
+Required use:
+
+- If no active driver workflow exists and this loop is the user's target, run `.local/sr-run.sh start worktree-review --label <short-label>`.
+- If a driver workflow already exists, run `.local/sr-run.sh status` and `.local/sr-run.sh next` before continuing, and follow the reported phase unless it conflicts with newer user instructions.
+- After completing each phase, record the transition with `.local/sr-run.sh advance <phase> --note <short-note>`.
+- If blocked by ambiguity, environment, validation, or review findings that cannot be fixed locally, run `.local/sr-run.sh block <reason>`.
+- When the loop is clean and any requested commit is complete, run `.local/sr-run.sh done --note <short-note>`.
+
+The driver records workflow position only. It does not replace the review method, materiality decisions, repair work, or the repo-local srctl commit hygiene gate.
+
 ## Continuation Guardrails
 
 When this workflow resumes from `/goal`, an interruption, compaction, duplicated environment context, or a side conversation handoff, do not restart the loop blindly. First reconcile the current execution state:

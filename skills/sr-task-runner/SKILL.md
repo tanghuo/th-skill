@@ -87,6 +87,14 @@ Status values:
 
 Do not maintain a parallel hidden checklist that disagrees with the files.
 
+If the target repository contains an executable `.local/sr-run.sh`, use it as the phase driver for runner-level workflow position:
+
+- If no active driver workflow exists and this runner is the user's target, run `.local/sr-run.sh start task-runner <task-dir-or-list> --label <short-label>`.
+- If a driver workflow already exists, run `.local/sr-run.sh status` and `.local/sr-run.sh next` before continuing, and follow the reported phase unless it conflicts with newer user instructions.
+- After inventory, ready-set execution, checkpoint review, final review, block, or completion, record the transition with `.local/sr-run.sh advance <phase> --note <short-note>`, `.local/sr-run.sh block <reason>`, or `.local/sr-run.sh done --note <short-note>`.
+
+The driver records workflow position only. It does not replace task files as source of truth, dependency scheduling, Host integration, validation, checkpoint review, or final integration review.
+
 Before starting:
 
 - read `00-overview.md` if present
