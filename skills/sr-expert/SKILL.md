@@ -212,6 +212,8 @@ Host-provided context should be minimal:
 - workspace identity: the absolute path or connector workspace id, plus a human-readable label when multiple worktrees exist
 - no Host conclusions, suspected bugs, implementation rationale, ranked risks, or "already checked" claims unless the user explicitly wants a verification pass rather than an independent review
 
+When another `sr-*` workflow has already frozen a target, inherit that exact frozen target. Do not independently re-resolve the review target from `git status`, and do not broaden a current-worktree review into branch-ahead commits unless those commits are part of the frozen target.
+
 Use packaged read-only review instead when:
 
 - the Expert cannot safely access the repository or worker copy
@@ -372,6 +374,12 @@ Permission rule:
 - "Only edit these files" is best-effort unless reinforced by working-directory isolation, CLI tool restrictions, filesystem permissions, connector scopes, or a disposable workspace.
 - For direct implementation, run the Expert inside the isolated Worker Workspace, not at the repository root.
 
+Session persistence rule:
+
+- The read-only and no-report-file constraints govern the reviewed workspace's filesystem, not the Expert's own session store. Persisting the Expert's session/transcript in its native client does not write to or pollute the reviewed repo, so a read-only review lane does not require an ephemeral, non-persisted Expert run.
+- Keep the Expert session persisted and reviewable in the Expert's native client. Do not pass an ephemeral or no-session-persistence flag merely to satisfy the read-only lane; use it only when the user explicitly wants a throwaway run.
+- Capture the Expert session handle (session id, thread id, or resume command) and report it, so the user can reopen the review in the Expert's client.
+
 Adapter entrypoints:
 
 - Codex Host -> Claude Expert: use the Codex -> Claude adapter preference below.
@@ -401,6 +409,8 @@ Preflight:
 - for cold workspace review, run the CLI from the reviewed repository or worker workspace when possible, expose only that directory, and allow only read-only inspection tools where the CLI supports tool scoping
 - for cold workspace review intended to avoid approval churn, require final-output/stdout reporting only and forbid report-file writes, tests, builds, generators, package installs, and network commands unless explicitly scoped
 - use a debug/transcript/log file when the CLI supports one and the run may be long
+- before spawning `claude`, strip the Claude Code nesting-guard variables (`CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `CLAUDE_CODE_SESSION`, `CLAUDE_CODE_PARENT_SESSION`) from the child environment; if the Host process runs inside a Claude Code session these leak into the child and the spawned `claude` refuses to start with "cannot be launched inside another session"
+- keep the review reviewable in the Claude client: Claude CLI persists sessions by default, including print-mode (`-p`) runs, so do not pass `--no-session-persistence`. There is no `--no-thread` flag; `--no-session-persistence` is the only suppressor and it must not be used here. Make the session locatable up front: pass a known `--session-id <uuid>` (or name it with `-n`), and run the Expert from the reviewed repo as its working directory. Report that session id together with the working directory, because Claude sessions are scoped per project; the user reopens the review with `claude --resume <id>` (or `/resume`) from that same directory
 
 Invocation preference:
 
@@ -430,6 +440,7 @@ Preflight:
 - otherwise inspect `codex --help` or the installed Codex CLI/connector docs for non-interactive mode, streaming or JSON output, transcript/log support, worktree support, and tool scoping
 - do not override the Codex connector or CLI default model by default. Specify a model only when the user explicitly requested one, or when a specific id/alias has been freshly verified and the reason for overriding the default is stated.
 - verify whether the Codex path shares the Host filesystem; if it does not, require a textual review report, unified diff, or Integration Diff instead of assuming local files changed
+- keep the review reviewable in the Codex client: `codex exec` persists the session by default, so do not pass `--ephemeral`. Capture the resulting session id and report it so the user can reopen the review via `codex resume <id>`, `codex fork`, or the Codex desktop app
 
 Invocation preference:
 
@@ -480,6 +491,9 @@ Review target:
 - workspace label: <human-readable worktree name/id>
 - base ref: <base branch/commit, if applicable>
 - scope: current worktree changes against the base ref / branch ... / commit range ... / task output ...
+- frozen target inherited from Host, if applicable: <exact frozen target; do not broaden>
+- explicitly out of scope: <paths, untracked files, staged changes, ahead commits, or other work not included>
+- scope rule: use repository commands to verify this target, but do not re-resolve or broaden it from `git status`
 - mode: read-only cold workspace review
 
 Run from the target workspace as your current working directory.
@@ -505,6 +519,8 @@ Start by inspecting the repository yourself:
 - `git diff <base ref>...`
 - changed-file list
 If no base ref applies or it is unavailable, use the plain worktree diff commands instead.
+
+Use these commands to understand and verify the requested target, not to choose a different target. If the requested target is current worktree changes and there is no tracked diff but untracked files exist, report that scope explicitly instead of switching to branch-ahead commits.
 
 Then build only the context needed to validate the change:
 - callers and consumers
@@ -619,6 +635,7 @@ When an Expert was used, say:
 
 - which lane was used
 - which adapter or Expert path was used
+- the Expert session handle (session id or resume command), so the user can reopen the review in the Expert's client
 - whether it was external/heterogeneous or a user-accepted same-host fallback
 - what the Expert materially found or changed
 - what was accepted, rejected, or still uncertain

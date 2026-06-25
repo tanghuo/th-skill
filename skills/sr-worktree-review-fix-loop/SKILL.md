@@ -64,8 +64,10 @@ Default target order:
 
 1. If the user named paths, commits, branches, or a diff range, review that exact target.
 2. If the user says `主工作区`, `当前工作区`, `worktree`, `dirty diff`, or `当前改动`, review the current checkout's uncommitted changes.
-3. If `git status --short --branch` is clean but the branch is ahead of upstream, review the ahead commits, usually `origin/<base>..HEAD`.
+3. If `git status --short --branch` is fully clean, including no untracked files, but the branch is ahead of upstream, review the ahead commits, usually `origin/<base>..HEAD`.
 4. If no local git target exists, say so and ask for the target.
+
+Do not reinterpret a requested current-worktree target as ahead commits merely because the branch is ahead of upstream. If the current-worktree target has no tracked diff but has untracked files, treat those untracked files as the candidate worktree target and ask or state the narrowed target before reviewing. Use the ahead-commit fallback only when the checkout is otherwise fully clean or the user explicitly asked for a branch, commit, or ahead-commit review.
 
 Start with read-only commands:
 
@@ -218,13 +220,20 @@ Host review
 -> repeat Expert cold workspace review until Host and Expert gates are clean or blocked
 ```
 
-Use `sr-expert`'s Cold Workspace Review lane by default. The Expert should be read-only and should start from `git status`, `git diff`, and the changed-file list instead of from the Host Agent's implementation summary.
+Use `sr-expert`'s Cold Workspace Review lane by default. The Expert should be read-only and should start from commands appropriate to the frozen target, such as `git status`, `git diff`, `git diff --cached`, `git ls-files --others --exclude-standard`, `git show`, or the changed-file list. These commands help the Expert verify the frozen target; they must not let the Expert independently re-resolve the review target from repository state.
+
+The Expert scope must exactly match this loop's frozen target:
+
+- if the frozen target is the current worktree diff, Expert reviews the same uncommitted tracked diff plus any explicitly included untracked files
+- if the frozen target is named paths or untracked files, Expert reviews only those paths and directly necessary context
+- if the frozen target is a commit, branch, or diff range, Expert reviews that exact commit/range
+- if branch-ahead commits are not part of the frozen target, tell the Expert they are out of scope even when `git status` shows the branch is ahead
 
 Host context to the Expert should stay minimal:
 
-- the frozen review target
+- the exact frozen review target
 - read-only constraint
-- excluded paths or forbidden actions, if any
+- excluded paths, ahead commits, or forbidden actions, if any
 - validation expectations or time budget, if relevant
 
 Do not send the Host Agent's own suspected bugs, ranked findings, implementation rationale, or "already checked" claims unless the user explicitly asks for verification rather than independent review.
