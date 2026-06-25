@@ -60,14 +60,16 @@ When the user explicitly asks for `sr-expert`, an external Expert, multi-model r
 
 ## Target Resolution
 
+Supplied content wins. If the user's message itself carries the review object -- pasted findings, a `Current Result`, an audit report, a bug/risk list, or a prior review conclusion -- that supplied content is the target. Use the repo only to verify its anchors and conclusions; do not re-resolve the target from git, and do not widen to worktree diff, ahead commits, or latest commit unless the user explicitly asks. A skill mention next to supplied content picks the review method, not a new target.
+
 Default target order:
 
 1. If the user named paths, commits, branches, or a diff range, review that exact target.
 2. If the user says `主工作区`, `当前工作区`, `worktree`, `dirty diff`, or `当前改动`, review the current checkout's uncommitted changes.
-3. If `git status --short --branch` is fully clean, including no untracked files, but the branch is ahead of upstream, review the ahead commits, usually `origin/<base>..HEAD`.
+3. If `git status --short --branch` is fully clean, including no untracked files, there is no worktree diff to review. Only on a bare `循环结构化review` trigger with no supplied content may you fall back to the ahead range, usually `origin/<base>..HEAD`; state the chosen range before reviewing.
 4. If no local git target exists, say so and ask for the target.
 
-Do not reinterpret a requested current-worktree target as ahead commits merely because the branch is ahead of upstream. If the current-worktree target has no tracked diff but has untracked files, treat those untracked files as the candidate worktree target and ask or state the narrowed target before reviewing. Use the ahead-commit fallback only when the checkout is otherwise fully clean or the user explicitly asked for a branch, commit, or ahead-commit review.
+Do not reinterpret a requested current-worktree target as ahead commits merely because the branch is ahead of upstream. If the current-worktree target has no tracked diff but has untracked files, treat those untracked files as the candidate worktree target and ask or state the narrowed target before reviewing. If the user asked for current worktree changes and there are no staged, unstaged, or untracked changes, stop and say there is no reviewable worktree diff. If useful, mention `origin/<base>..HEAD` and `HEAD^..HEAD` as candidate commit targets and ask which one to review.
 
 Start with read-only commands:
 
